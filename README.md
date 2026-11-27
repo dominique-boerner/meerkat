@@ -10,21 +10,23 @@
 
 Meerkat keeps an eye on your development environment so you do not have to. A small status bar in the
 corner of the screen shows whether your containers and pipelines are fine. It stays out of the way:
-every click passes straight through it, and as long as everything works it is one quiet line.
+it never takes the keyboard focus from your editor, and as long as everything works it is one quiet
+line.
 
-When something breaks, the status bar says what and since when. A global hotkey opens a side panel
-with the details and the actions to deal with it.
+When something breaks, the status bar says what and since when. A click on it, or a global hotkey,
+opens a side panel with the details and the actions to deal with it.
 
 Meerkat is a generic shell that hosts **widgets**. It ships with widgets for Docker containers running
-inside WSL, for GitLab and GitHub, and for servers reachable over SSH.
+inside WSL, for GitLab and GitHub, for servers reachable over SSH, and for notes.
 
 ## Features
 
 **Shell**
 
-- *Status bar*: one chip per widget, always on top, click-through, never takes focus
-- Errors appear as cards below the status bar with their age; warnings are only counted, so the bar
-  stays small
+- *Status bar*: one chip per widget, always on top; a click opens the panel without taking the
+  keyboard focus away from the application you work in
+- Errors appear as cards below the status bar with their age; a click on a card opens the page of the
+  widget that reported it. Warnings are only counted, so the bar stays small
 - *Panel*: a side panel, opened with a global hotkey, with one page per widget and badges for
   widgets that need attention; it stays open next to your work until you close it
 - A second hotkey hides and shows Meerkat entirely; hidden widgets stop polling
@@ -97,7 +99,8 @@ Meerkat shows its status bar in the top right corner and adds an icon to the not
 | Write a quick note | `Ctrl+Alt+N` |
 | Add a task | `Ctrl+Alt+T` |
 
-The panel stays open while you work in other windows. It closes when you press `Esc` inside it,
+Click the status bar to open or close the panel, or click a card to open the panel on the page it
+belongs to. The panel stays open while you work in other windows. It closes when you press `Esc` inside it,
 press the hotkey again or use its close button. Drag its left edge to change the width, for example to read long log
 lines; a double-click on the edge restores the default. Both actions are also available from the tray icon.
 
@@ -183,7 +186,7 @@ never changes anything there. If you remove one of the headings, it is created a
 entry. Tasks you completed stay visible for the rest of the day and move to `archive.md` on the next
 one, or are deleted if you prefer that.
 
-The pin button of the scratchpad shows its tasks below the status bar.
+The pin button of the scratchpad shows its tasks below the status bar; a click on them opens the scratchpad.
 
 ## Building from source
 

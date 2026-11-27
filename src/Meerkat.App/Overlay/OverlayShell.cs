@@ -57,6 +57,8 @@ public sealed class OverlayShell(
         _panelWindow.WidthCommitted += (_, _) => SavePanelWidth();
 
         panel.CloseRequested += (_, _) => SetPanelOpen(false);
+        statusBar.PanelToggleRequested += (_, _) => TogglePanel();
+        statusBar.WidgetRequested += (_, widgetId) => ShowWidget(widgetId);
         panel.SettingsRequested += (_, _) => OpenSettings();
         tray.ToggleVisibilityRequested += (_, _) => ToggleVisibility();
         tray.TogglePanelRequested += (_, _) => TogglePanel();
@@ -195,12 +197,13 @@ public sealed class OverlayShell(
         {
             return new WidgetReport(
                 new WidgetStatus(hosted.Entry.Title, "–", WidgetSeverity.Error),
-                [new WidgetAlert(WidgetSeverity.Error, $"{hosted.Entry.Title} widget was suspended", failure.Detail, hosted.FailedSince)]);
+                [new WidgetAlert(WidgetSeverity.Error, $"{hosted.Entry.Title} widget was suspended", failure.Detail, hosted.FailedSince)],
+                WidgetId: hosted.Entry.Id);
         }
 
         try
         {
-            return new WidgetReport(hosted.Widget.Status, hosted.Widget.Alerts, hosted.Widget.StatusCard);
+            return new WidgetReport(hosted.Widget.Status, hosted.Widget.Alerts, hosted.Widget.StatusCard, hosted.Entry.Id);
         }
         catch (Exception exception)
         {
@@ -222,7 +225,18 @@ public sealed class OverlayShell(
         }
     }
 
-    private void TogglePanel() => SetPanelOpen(!state.IsPanelOpen);
+private void TogglePanel() => SetPanelOpen(!state.IsPanelOpen);
+
+    /// <summary>Opens the panel on the page of a widget; without an id the panel opens where it was left.</summary>
+    private void ShowWidget(string? widgetId)
+    {
+        if (_hostedWidgets.FirstOrDefault(hosted => hosted.IsActive && hosted.Entry.Id == widgetId) is { } hosted)
+        {
+            panel.SelectCommand.Execute(hosted.Entry);
+        }
+
+        SetPanelOpen(true);
+    }
 
     private void SetPanelOpen(bool isOpen, bool animated = true)
     {

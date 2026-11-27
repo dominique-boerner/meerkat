@@ -62,7 +62,7 @@ public class ShellViewModelTests
         Assert.Equal("+1", statusBar.MoreHintsCount);
         Assert.Equal("more hint – only in the panel", statusBar.MoreHintsText);
         Assert.True(statusBar.HasAlerts);
-        Assert.Equal("Details: Ctrl+Alt+M", statusBar.DetailsHint);
+        Assert.Equal("Details (Ctrl+Alt+M)", statusBar.DetailsToolTip);
         Assert.Equal("Update 1.3.0 ready", statusBar.Notice);
     }
 
@@ -72,8 +72,8 @@ public class ShellViewModelTests
         var statusBar = new StatusBarViewModel();
         var card = new WidgetStatusCard("Tasks · 1 of 2 done", [new WidgetStatusCardLine("Review", IsDone: true), new WidgetStatusCardLine("Check mapping")]);
 
-        statusBar.Update([new WidgetReport(null, [], card), new WidgetReport(null, [])], Now, "Ctrl+Alt+M", notice: null);
-        Assert.Equal([card], statusBar.Cards);
+        statusBar.Update([new WidgetReport(null, [], card, "notes"), new WidgetReport(null, [])], Now, "Ctrl+Alt+M", notice: null);
+        Assert.Equal([new StatusCardViewModel(card, "notes")], statusBar.Cards);
 
         // A widget without status and alerts shows nothing but its card.
         Assert.Empty(statusBar.Chips);
@@ -81,6 +81,33 @@ public class ShellViewModelTests
 
         statusBar.Update([new WidgetReport(null, [])], Now, "Ctrl+Alt+M", notice: null);
         Assert.Empty(statusBar.Cards);
+    }
+
+    [Fact]
+    public void StatusBar_AsksForThePageOfTheWidgetBehindAClickedCard()
+    {
+        var statusBar = new StatusBarViewModel();
+        statusBar.Update(
+            [
+                new WidgetReport(
+                    new WidgetStatus("Pipelines", "5/6", WidgetSeverity.Error),
+                    [new WidgetAlert(WidgetSeverity.Error, "1 workflow run failed", "main", Now.AddMinutes(-4))],
+                    WidgetId: "git"),
+            ],
+            Now,
+            "Ctrl+Alt+M",
+            notice: null);
+        var requested = new List<string?>();
+        var toggles = 0;
+        statusBar.WidgetRequested += (_, widgetId) => requested.Add(widgetId);
+        statusBar.PanelToggleRequested += (_, _) => toggles++;
+
+        statusBar.OpenWidgetCommand.Execute(statusBar.Alerts[0].WidgetId);
+        statusBar.OpenWidgetCommand.Execute(null);
+        statusBar.TogglePanelCommand.Execute(null);
+
+        Assert.Equal(["git", null], requested);
+        Assert.Equal(1, toggles);
     }
 
     [Fact]

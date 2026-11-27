@@ -5,7 +5,10 @@ using Meerkat.App.Interop;
 
 namespace Meerkat.App.Overlay;
 
-/// <summary>The always-visible status display. It never takes input: every click passes through to the window below.</summary>
+/// <summary>
+/// The always-visible status display. Its bar and cards can be clicked to open the panel, but the window
+/// never becomes the active one, so the application the user works in keeps the keyboard focus.
+/// </summary>
 public partial class StatusBarWindow : Window
 {
     public StatusBarWindow()
@@ -36,11 +39,12 @@ public partial class StatusBarWindow : Window
     {
         base.OnSourceInitialized(e);
 
-        // Transparent lets clicks through, no-activate keeps focus in the application below,
-        // and tool window keeps the bar out of Alt+Tab.
+        // No-activate keeps the focus in the application below even when the bar is clicked, and tool window
+        // keeps the bar out of Alt+Tab. The window spans the whole work area, but Windows only delivers clicks
+        // where something is drawn; everywhere else they reach the window underneath.
         var handle = new WindowInteropHelper(this).Handle;
         var style = NativeMethods.GetWindowLongPtr(handle, NativeMethods.GwlExStyle).ToInt64();
-        style |= NativeMethods.WsExTransparent | NativeMethods.WsExNoActivate | NativeMethods.WsExToolWindow;
+        style |= NativeMethods.WsExNoActivate | NativeMethods.WsExToolWindow;
         NativeMethods.SetWindowLongPtr(handle, NativeMethods.GwlExStyle, new IntPtr(style));
     }
 }

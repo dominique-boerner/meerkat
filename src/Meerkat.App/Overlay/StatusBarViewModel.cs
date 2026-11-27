@@ -1,15 +1,19 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Meerkat.Abstractions;
 
 namespace Meerkat.App.Overlay;
 
 public sealed record StatusChipViewModel(string Label, string Summary, WidgetSeverity Severity);
 
-public sealed record AlertCardViewModel(string Title, string Detail, string AgeText);
+/// <param name="WidgetId">The widget that reported the alert; its page opens when the card is clicked.</param>
+public sealed record AlertCardViewModel(string Title, string Detail, string AgeText, string? WidgetId = null);
+
+public sealed record StatusCardViewModel(WidgetStatusCard Card, string? WidgetId = null);
 
 /// <summary>What one widget currently reports to the shell.</summary>
-public sealed record WidgetReport(WidgetStatus? Status, IReadOnlyList<WidgetAlert> Alerts, WidgetStatusCard? Card = null);
+public sealed record WidgetReport(WidgetStatus? Status, IReadOnlyList<WidgetAlert> Alerts, WidgetStatusCard? Card = null, string? WidgetId = null);
 
 /// <summary>
 /// Backs the always-visible status bar: one chip per widget, plus a card for every error. Warnings are
@@ -28,8 +32,9 @@ public sealed partial class StatusBarViewModel : ObservableObject
     [ObservableProperty]
     private bool _hasAlerts;
 
+    /// <summary>Shown when the pointer rests on the logo; the bar itself does not advertise the hotkey.</summary>
     [ObservableProperty]
-    private string _detailsHint = string.Empty;
+    private string _detailsToolTip = string.Empty;
 
     /// <summary>A message from the shell itself, e.g. a pending update.</summary>
     [ObservableProperty]
@@ -40,7 +45,13 @@ public sealed partial class StatusBarViewModel : ObservableObject
     public ObservableCollection<AlertCardViewModel> Alerts { get; } = [];
 
     /// <summary>What widgets keep in view on the user's request, shown below everything that reports a problem.</summary>
-    public ObservableCollection<WidgetStatusCard> Cards { get; } = [];
+public ObservableCollection<StatusCardViewModel> Cards { get; } = [];
+
+    /// <summary>Raised when a card was clicked, with the id of the widget whose page should be shown, if any.</summary>
+    public event EventHandler<string?>? WidgetRequested;
+
+    /// <summary>Raised when the bar itself was clicked.</summary>
+    public event EventHandler? PanelToggleRequested;
 
     public void Update(IReadOnlyList<WidgetReport> reports, DateTimeOffset now, string panelHotkeyText, string? notice)
     {
@@ -49,14 +60,14 @@ public sealed partial class StatusBarViewModel : ObservableObject
             .OfType<WidgetStatus>()
             .Select(status => new StatusChipViewModel(status.Label, status.Summary, status.Severity)));
 
-        Replace(Cards, reports.Select(report => report.Card).OfType<WidgetStatusCard>());
+        Replace(Cards, reports.Where(report => report.Card is not null).Select(report => new StatusCardViewModel(report.Card!, report.WidgetId)));
 
-        var alerts = reports.SelectMany(report => report.Alerts).ToList();
-        var errors = alerts.Where(alert => alert.Severity == WidgetSeverity.Error).OrderBy(alert => alert.Since).ToList();
-        Replace(Alerts, errors.Take(MaxAlertCards).Select(alert => new AlertCardViewModel(alert.Title, alert.Detail, FormatAge(now - alert.Since))));
+        var alerts = reports.SelectMany(report => report.Alerts.Select(alert => (Alert: alert, report.WidgetId))).ToList();
+        var errors = alerts.Where(entry => entry.Alert.Severity == WidgetSeverity.Error).OrderBy(entry => entry.Alert.Since).ToList();
+        Replace(Alerts, errors.Take(MaxAlertCards).Select(entry => new AlertCardViewModel(entry.Alert.Title, entry.Alert.Detail, FormatAge(now - entry.Alert.Since), entry.WidgetId)));
 
         var hiddenErrors = errors.Count - Alerts.Count;
-        var warnings = alerts.Count(alert => alert.Severity == WidgetSeverity.Warning);
+        var warnings = alerts.Count(entry => entry.Alert.Severity == WidgetSeverity.Warning);
         MoreHintsCount = hiddenErrors + warnings > 0 ? $"+{hiddenErrors + warnings}" : null;
         MoreHintsText = (hiddenErrors, warnings) switch
         {
@@ -66,9 +77,15 @@ public sealed partial class StatusBarViewModel : ObservableObject
         };
 
         HasAlerts = alerts.Count > 0;
-        DetailsHint = $"Details: {panelHotkeyText}";
+        DetailsToolTip = $"Details ({panelHotkeyText})";
         Notice = notice;
     }
+
+    [RelayCommand]
+    private void OpenWidget(string? widgetId) => WidgetRequested?.Invoke(this, widgetId);
+
+    [RelayCommand]
+    private void TogglePanel() => PanelToggleRequested?.Invoke(this, EventArgs.Empty);
 
     public static string FormatAge(TimeSpan age)
     {

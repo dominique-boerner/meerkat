@@ -161,13 +161,14 @@ Choose severities with that in mind:
   that is simply not set up yet. Return a null `Status` in the latter case.
 - Set `Since` to the moment the condition was first observed and keep it stable across refreshes; the
   shell shows it as the alert's age and uses it to order cards.
-- Show the same problem on your page, with the actions to resolve it. The status bar cannot be clicked.
+- Show the same problem on your page, with the actions to resolve it. A click on the card only opens
+  your page; it cannot act on the problem.
 
 ## Status cards and hotkeys
 
 A widget can keep something in view below the status bar by returning a `WidgetStatusCard`: a title
 and a few lines, each optionally struck through. Only do this on the user's request, for example
-behind a pin button, and return null otherwise. The status bar lets clicks through, so a card can be
+behind a pin button, and return null otherwise. A click on the card opens your page, so a card can be
 read but not operated.
 
 A widget can also offer global hotkeys:

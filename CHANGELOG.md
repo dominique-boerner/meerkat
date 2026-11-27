@@ -18,6 +18,13 @@ The section of a version becomes the text of its GitHub release and is what Meer
 - Widgets can offer global hotkeys, which are listed and changed on the Hotkeys page, and can show a
   card below the status bar.
 
+### Changed
+
+- The status bar can be clicked: a click on the bar opens or closes the panel, a click on a card
+  opens the panel on the page of the widget it belongs to. Clicking does not take the keyboard focus
+  from the application you work in, and a slight highlight shows what can be clicked.
+- The "Details" hint below the cards is gone. The hotkey is shown as a tooltip of the logo instead.
+
 ## [1.4.0] - 2026-11-27
 
 ### Added

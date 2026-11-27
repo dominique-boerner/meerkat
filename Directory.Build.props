@@ -11,7 +11,7 @@
     <!-- Local builds use this version; the release pipeline overrides it with the Git tag. -->
     <Version>1.4.0</Version>
     <Product>Meerkat</Product>
-    <Description>A click-through desktop overlay for developers, built from widgets.</Description>
+    <Description>An unobtrusive desktop overlay for developers, built from widgets.</Description>
     <Copyright>Copyright (c) Meerkat contributors</Copyright>
     <NeutralLanguage>en</NeutralLanguage>
     <RepositoryUrl>https://github.com/dominique-boerner/meerkat</RepositoryUrl>

@@ -6,7 +6,6 @@ internal static class NativeMethods
 {
     public const int GwlExStyle = -20;
 
-    public const long WsExTransparent = 0x00000020;
     public const long WsExToolWindow = 0x00000080;
     public const long WsExNoActivate = 0x08000000;
 

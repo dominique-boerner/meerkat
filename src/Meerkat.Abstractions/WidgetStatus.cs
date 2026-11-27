@@ -20,7 +20,7 @@ public sealed record WidgetAlert(WidgetSeverity Severity, string Title, string D
 
 /// <summary>
 /// Something the user chose to keep in view below the status bar, such as a task list. The status bar
-/// lets clicks through, so a card can only be read, not operated.
+/// only opens the widget's page when a card is clicked, so a card can be read, not operated.
 /// </summary>
 public sealed record WidgetStatusCard(string Title, IReadOnlyList<WidgetStatusCardLine> Lines);
 
