@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -13,10 +14,12 @@ public sealed record MonitorOption(string? DeviceName, string DisplayName);
 
 public sealed record ChannelOption(UpdateChannel Channel, string DisplayName);
 
-public sealed record WidgetSettingsSection(string Title, IWidgetSettingsPage Page, FrameworkElement View);
+/// <param name="WidgetId">The widget the page belongs to; the page is only offered while that widget is enabled.</param>
+public sealed record WidgetSettingsSection(string Title, IWidgetSettingsPage Page, FrameworkElement View, string? WidgetId = null);
 
 /// <summary>An entry of the settings navigation; <see cref="Badge"/> marks the entry while an update is pending.</summary>
-public sealed record NavigationItem(string Title, UpdateViewModel? Badge = null);
+/// <param name="Section">The settings page of a widget this entry opens; null for the pages of the shell.</param>
+public sealed record NavigationItem(string Title, UpdateViewModel? Badge = null, WidgetSettingsSection? Section = null);
 
 public sealed partial class WidgetToggleViewModel(string id, string title, string typeName, bool isEnabled) : ObservableObject
 {
@@ -32,10 +35,16 @@ public sealed partial class WidgetToggleViewModel(string id, string title, strin
 
 /// <summary>A hotkey offered by a widget, as edited in the settings.</summary>
 /// <param name="settingsKey">Key under which the chosen combination is stored.</param>
-public sealed partial class WidgetHotkeyViewModel(string settingsKey, string title, string widgetTitle, string gesture) : ObservableObject
+/// <param name="widgetId">The widget the hotkey belongs to; it is only offered while that widget is enabled.</param>
+public sealed partial class WidgetHotkeyViewModel(string settingsKey, string title, string widgetTitle, string gesture, string? widgetId = null) : ObservableObject
 {
     [ObservableProperty]
     private string _gesture = gesture;
+
+    [ObservableProperty]
+    private bool _isAvailable = true;
+
+    public string? WidgetId { get; } = widgetId;
 
     public string SettingsKey { get; } = settingsKey;
 
@@ -50,6 +59,8 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     private readonly SettingsService _settings;
     private readonly IAutostart? _autostart;
+    private readonly IReadOnlyList<NavigationItem> _widgetItems;
+    private IReadOnlyList<WidgetHotkeyViewModel> _widgetHotkeys = [];
 
     [ObservableProperty]
     private string _togglePanelHotkey;
@@ -97,12 +108,19 @@ public sealed partial class SettingsViewModel : ObservableObject
         WidgetSections = widgetSections;
         Update = update;
         SettingsFilePath = settingsFilePath;
+        _widgetItems = [.. widgetSections.Select(section => new NavigationItem(section.Title, Section: section))];
         NavigationItems =
         [
             .. ShellSectionTitles.Select(title => new NavigationItem(title)),
-            .. widgetSections.Select(section => new NavigationItem(section.Title)),
+            .. _widgetItems.Where(item => IsEnabled(item.Section!.WidgetId)),
             new NavigationItem("Updates", update),
         ];
+
+        // Switching a widget off takes its settings page away at once, switching it on brings the page back.
+        foreach (var widget in widgets)
+        {
+            widget.PropertyChanged += (_, _) => UpdateAvailability();
+        }
 
         var current = settings.Current;
         _togglePanelHotkey = HotkeyGesture.ToDisplayText(current.TogglePanelHotkey);
@@ -121,7 +139,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     public Func<IDisposable>? SuspendHotkeys { get; init; }
 
     /// <summary>Shell sections first, then one entry per widget settings page, then the update page.</summary>
-    public IReadOnlyList<NavigationItem> NavigationItems { get; }
+    public ObservableCollection<NavigationItem> NavigationItems { get; }
 
     public IReadOnlyList<MonitorOption> Monitors { get; }
 
@@ -133,7 +151,15 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public IReadOnlyList<WidgetToggleViewModel> Widgets { get; }
 
-    public IReadOnlyList<WidgetHotkeyViewModel> WidgetHotkeys { get; init; } = [];
+    public IReadOnlyList<WidgetHotkeyViewModel> WidgetHotkeys
+    {
+        get => _widgetHotkeys;
+        init
+        {
+            _widgetHotkeys = value;
+            UpdateAvailability();
+        }
+    }
 
     /// <summary>Switches the start with Windows on and off; without it the option is not offered.</summary>
     public IAutostart? Autostart
@@ -155,6 +181,39 @@ public sealed partial class SettingsViewModel : ObservableObject
     public string SettingsFilePath { get; }
 
     public string OpacityText => $"{Math.Round(Opacity * 100).ToString(CultureInfo.CurrentCulture)} %";
+
+    private bool IsEnabled(string? widgetId) => widgetId is null || Widgets.FirstOrDefault(widget => widget.Id == widgetId) is not { IsEnabled: false };
+
+    /// <summary>
+    /// A widget that is switched off offers nothing to configure: neither its settings page nor its hotkeys.
+    /// What was set for it is kept, so it is all there again when the widget is switched back on.
+    /// </summary>
+    private void UpdateAvailability()
+    {
+        foreach (var hotkey in _widgetHotkeys)
+        {
+            hotkey.IsAvailable = IsEnabled(hotkey.WidgetId);
+        }
+
+        var position = ShellSectionTitles.Length;
+        foreach (var item in _widgetItems)
+        {
+            var isListed = NavigationItems.Contains(item);
+            if (IsEnabled(item.Section!.WidgetId))
+            {
+                if (!isListed)
+                {
+                    NavigationItems.Insert(position, item);
+                }
+
+                position++;
+            }
+            else if (isListed)
+            {
+                NavigationItems.Remove(item);
+            }
+        }
+    }
 
     public bool TrySave()
     {

@@ -48,18 +48,23 @@ public partial class SettingsWindow : Window
             return;
         }
 
+        // The entry of a widget that is being switched off disappears while it may still be selected.
+        if (Navigation.SelectedItem is not NavigationItem selected)
+        {
+            Navigation.SelectedIndex = 0;
+            return;
+        }
+
+        // The navigation lists the shell sections, then the pages of the enabled widgets, then the update page.
         FrameworkElement[] shellSections = [HotkeysSection, GeneralSection, WidgetsSection];
-        var selectedIndex = Math.Max(0, Navigation.SelectedIndex);
+        var selectedIndex = Navigation.SelectedIndex;
         for (var index = 0; index < shellSections.Length; index++)
         {
             shellSections[index].Visibility = ToVisibility(index == selectedIndex);
         }
 
-        // The navigation lists the shell sections, then the widget pages, then the update page.
-        var selectedWidgetIndex = selectedIndex - shellSections.Length;
-        var isWidgetPage = selectedWidgetIndex >= 0 && selectedWidgetIndex < WidgetSections.Items.Count;
-        WidgetSections.Visibility = ToVisibility(isWidgetPage);
-        UpdatesSection.Visibility = ToVisibility(selectedWidgetIndex >= WidgetSections.Items.Count);
+        WidgetSections.Visibility = ToVisibility(selected.Section is not null);
+        UpdatesSection.Visibility = ToVisibility(selected.Section is null && selectedIndex >= shellSections.Length);
 
         // Item containers are only generated once the list has been laid out while visible.
         WidgetSections.UpdateLayout();
@@ -67,7 +72,7 @@ public partial class SettingsWindow : Window
         {
             if (WidgetSections.ItemContainerGenerator.ContainerFromIndex(index) is FrameworkElement container)
             {
-                container.Visibility = ToVisibility(index == selectedWidgetIndex);
+                container.Visibility = ToVisibility(ReferenceEquals(WidgetSections.Items[index], selected.Section));
             }
         }
     }

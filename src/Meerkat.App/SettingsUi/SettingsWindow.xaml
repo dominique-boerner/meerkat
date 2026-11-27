@@ -186,7 +186,7 @@
                         <ItemsControl ItemsSource="{Binding WidgetHotkeys}" Focusable="False">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Grid>
+                                    <Grid Visibility="{Binding IsAvailable, Converter={StaticResource BoolToVisibility}}">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="162" />
                                             <ColumnDefinition Width="142" />

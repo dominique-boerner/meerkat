@@ -124,7 +124,9 @@ lines; a double-click on the edge restores the default. Both actions are also av
 
 Open the settings from the tray icon or the gear button in the panel. You can change the hotkeys,
 whether Meerkat starts when you sign in to Windows, the opacity of the status bar, the monitor
-Meerkat appears on, which widgets are enabled, and the settings each widget contributes.
+Meerkat appears on, which widgets are enabled, and the settings each widget contributes. A widget
+that is switched off offers no settings and no hotkeys until it is switched on again; what was set
+for it is kept.
 
 Everything is stored as JSON in `%AppData%\Meerkat\settings.json`. Errors are logged to
 `%AppData%\Meerkat\error.log`.

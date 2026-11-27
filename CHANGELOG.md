@@ -25,6 +25,10 @@ The section of a version becomes the text of its GitHub release and is what Meer
 
 ### Changed
 
+- Every widget page has the same kind of header in the same place, and headings, spacing and type
+  sizes are the same across the pages.
+- A widget that is switched off no longer offers a settings page or hotkeys; they return when it is
+  switched on again.
 - Notes can be written with the keyboard alone: `Ctrl+Enter` continues in a new block below, `Tab`,
   `Shift+Tab` and the arrow keys move between blocks, and after `Esc` the block stays selected so
   that `Enter` opens it again.

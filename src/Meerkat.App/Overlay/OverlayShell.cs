@@ -382,7 +382,8 @@ public sealed class OverlayShell(
                 hotkey.SettingsKey,
                 hotkey.Definition.Title,
                 hosted.Entry.Title,
-                HotkeyGesture.ToDisplayText(GetGestureText(hotkey)))))],
+                HotkeyGesture.ToDisplayText(GetGestureText(hotkey)),
+                hosted.Entry.Id)))],
         };
         settingsViewModel.Saved += async (_, _) =>
         {
@@ -412,7 +413,7 @@ public sealed class OverlayShell(
             {
                 if (hosted.Widget.SettingsPage is { } page)
                 {
-                    sections.Add(new WidgetSettingsSection(hosted.Entry.Title, page, page.CreateView()));
+                    sections.Add(new WidgetSettingsSection(hosted.Entry.Title, page, page.CreateView(), hosted.Entry.Id));
                 }
             }
             catch (Exception exception)

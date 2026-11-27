@@ -141,6 +141,40 @@ public sealed class SettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public void SettingsViewModel_OffersNothingToConfigureForDisabledWidgets()
+    {
+        var docker = new WidgetToggleViewModel("docker", "Docker", "Meerkat.Widgets.Docker", isEnabled: true);
+        var notes = new WidgetToggleViewModel("notes", "Notes", "Meerkat.Widgets.Notes", isEnabled: false);
+        var page = new StubSettingsPage();
+        var viewModel = new SettingsViewModel(
+            new SettingsService(FilePath),
+            [new MonitorOption(null, "Primary monitor")],
+            [docker, notes],
+            [new WidgetSettingsSection("Docker", page, null!, "docker"), new WidgetSettingsSection("Notes", page, null!, "notes")],
+            _updates.ViewModel,
+            hotkeyWarning: null,
+            FilePath)
+        {
+            WidgetHotkeys = [new WidgetHotkeyViewModel("notes/quick-note", "Quick note", "Notes", "Ctrl+Alt+N", "notes")],
+        };
+
+        Assert.Equal(["Hotkeys", "General", "Widgets", "Docker", "Updates"], viewModel.NavigationItems.Select(item => item.Title));
+        Assert.False(viewModel.WidgetHotkeys[0].IsAvailable);
+
+        // Switching widgets on and off shows and hides their pages right away, in the order of the widgets.
+        notes.IsEnabled = true;
+        Assert.Equal(["Hotkeys", "General", "Widgets", "Docker", "Notes", "Updates"], viewModel.NavigationItems.Select(item => item.Title));
+        Assert.True(viewModel.WidgetHotkeys[0].IsAvailable);
+
+        docker.IsEnabled = false;
+        Assert.Equal(["Hotkeys", "General", "Widgets", "Notes", "Updates"], viewModel.NavigationItems.Select(item => item.Title));
+
+        docker.IsEnabled = true;
+        Assert.Equal(["Hotkeys", "General", "Widgets", "Docker", "Notes", "Updates"], viewModel.NavigationItems.Select(item => item.Title));
+        Assert.Same(page, viewModel.NavigationItems[3].Section?.Page);
+    }
+
+    [Fact]
     public void SettingsViewModel_SwitchesAutostartOnlyWhenTheUserChangedIt()
     {
         var autostart = new FakeAutostart { IsEnabled = true };
@@ -188,6 +222,15 @@ public sealed class SettingsServiceTests : IDisposable
 
     private SettingsViewModel CreateViewModel(SettingsService service, params WidgetToggleViewModel[] widgets) =>
         new(service, [new MonitorOption(null, "Primary monitor")], widgets, [], _updates.ViewModel, hotkeyWarning: null, FilePath);
+
+    private sealed class StubSettingsPage : Meerkat.Abstractions.IWidgetSettingsPage
+    {
+        public System.Windows.FrameworkElement CreateView() => throw new NotSupportedException();
+
+        public void Apply()
+        {
+        }
+    }
 
     private sealed class FakeAutostart : IAutostart
     {
