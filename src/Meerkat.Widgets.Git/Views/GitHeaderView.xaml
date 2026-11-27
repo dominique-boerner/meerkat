@@ -5,7 +5,7 @@
     <DockPanel>
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
             <!-- How old the shown data is. -->
-            <TextBlock Style="{DynamicResource Overlay.Hint}" Text="{Binding AgeText}" Margin="0,0,8,0" />
+            <TextBlock Style="{DynamicResource Overlay.Hint}" Text="{Binding AgeText}" Margin="0,0,8,0" VerticalAlignment="Center" />
             <Button Style="{DynamicResource Overlay.IconButton}"
                     Content="&#xE72C;"
                     ToolTip="Refresh now"
@@ -16,6 +16,9 @@
                     Command="{Binding OpenSettingsCommand}" />
         </StackPanel>
 
-        <TextBlock Style="{DynamicResource Overlay.Hint}" Text="{Binding ProviderSummary}" />
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Style="{DynamicResource Overlay.ColumnHeader}" FontSize="10.5" Text="GIT" />
+            <TextBlock Style="{DynamicResource Overlay.Hint}" Text="{Binding ProviderSummary, StringFormat=' · {0}'}" />
+        </StackPanel>
     </DockPanel>
 </UserControl>

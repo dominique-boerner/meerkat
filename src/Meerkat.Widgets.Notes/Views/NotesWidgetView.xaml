@@ -186,12 +186,13 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="188" />
+            <ColumnDefinition Width="182" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
         <Border Grid.Column="0" BorderBrush="{DynamicResource Overlay.Border}" BorderThickness="0,0,1,0">
-            <DockPanel Margin="8,10">
+            <!-- Flush with the header above on the left and at the top, like the content of every other page. -->
+            <DockPanel Margin="0,0,10,0">
                 <Grid DockPanel.Dock="Top" Margin="0,0,0,6">
                     <TextBox x:Name="SearchBox" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Padding="26,5,6,5" />
                     <TextBlock Text="&#xE721;"
@@ -244,7 +245,7 @@
         </Border>
 
         <DockPanel Grid.Column="1">
-            <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource Overlay.Border}" BorderThickness="0,0,0,1" Padding="16,6,8,6">
+            <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource Overlay.Border}" BorderThickness="0,0,0,1" Padding="16,0,0,6">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button Command="{Binding TogglePinCommand}"
@@ -319,7 +320,7 @@
                 </DockPanel>
             </Border>
 
-            <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource Overlay.Border}" BorderThickness="0,1,0,0" Padding="16,6">
+            <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource Overlay.Border}" BorderThickness="0,1,0,0" Padding="16,6,0,0">
                 <DockPanel>
                     <TextBlock DockPanel.Dock="Right" Text="Ctrl+Enter new block · Tab next · Esc done" FontSize="10.5" Foreground="{DynamicResource Overlay.TextMuted}" Margin="12,0,0,0" />
                     <TextBlock Text="{Binding PathText}" FontFamily="{DynamicResource Overlay.MonoFont}" FontSize="10.5" Foreground="{DynamicResource Overlay.TextMuted}" TextTrimming="CharacterEllipsis" />
@@ -327,7 +328,7 @@
             </Border>
 
             <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
-                <StackPanel Margin="18,8,18,12">
+                <StackPanel Margin="18,8,12,12">
                     <ItemsControl x:Name="BlockList" ItemsSource="{Binding Blocks}" ItemTemplate="{StaticResource Block}" Focusable="False" />
                     <Border x:Name="AddArea"
                             Background="Transparent"

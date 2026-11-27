@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Name="Root"
              Foreground="{DynamicResource Overlay.Text}"
-             FontSize="12.5">
+             FontSize="12">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
         <SolidColorBrush x:Key="WarningSurface" Color="#1AF2B84B" />
@@ -35,7 +35,7 @@
         <DataTemplate x:Key="Service">
             <Grid>
                 <!-- A service that is fine, or whose state is not known yet, takes one quiet line. -->
-                <Border x:Name="Row" BorderBrush="{DynamicResource Overlay.Border}" BorderThickness="0,0,0,1" Padding="6,13">
+                <Border x:Name="Row" BorderBrush="{DynamicResource Overlay.Border}" BorderThickness="0,0,0,1" Padding="8,10">
                     <StackPanel>
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -45,7 +45,7 @@
                                 <ColumnDefinition Width="86" />
                             </Grid.ColumnDefinitions>
                             <Ellipse x:Name="RowDot" Width="8" Height="8" Margin="0,1,12,0" VerticalAlignment="Center" Fill="{StaticResource UnknownDot}" />
-                            <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" FontSize="13.5" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis" />
                             <TextBlock x:Name="RowStatus" Grid.Column="2" Text="{Binding StatusText}" Margin="12,0" VerticalAlignment="Center" Foreground="{DynamicResource Overlay.TextMuted}" />
                             <TextBlock Grid.Column="3" Text="{Binding CheckedText}" HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{DynamicResource Overlay.TextMuted}" />
                         </Grid>
@@ -64,17 +64,17 @@
                         BorderBrush="{DynamicResource Overlay.Warning}"
                         BorderThickness="1"
                         CornerRadius="8"
-                        Padding="16,13,16,10"
+                        Padding="12,10,12,8"
                         Margin="0,0,0,8"
                         Visibility="Collapsed">
                     <StackPanel>
                         <DockPanel>
                             <TextBlock DockPanel.Dock="Right" Text="{Binding SinceText}" VerticalAlignment="Center" Foreground="{DynamicResource Overlay.TextMuted}" />
                             <ContentControl Content="{Binding Severity}" ContentTemplate="{StaticResource SeverityDot}" VerticalAlignment="Center" Margin="0,1,12,0" Focusable="False" />
-                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14.5" />
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" />
                             <TextBlock x:Name="CardStatus" Text="{Binding StatusText}" Margin="12,0,12,0" VerticalAlignment="Center" Foreground="{DynamicResource Overlay.Warning}" TextTrimming="CharacterEllipsis" />
                         </DockPanel>
-                        <TextBlock x:Name="IncidentText" Text="{Binding Incident}" Margin="0,8,0,0" FontSize="13" TextWrapping="Wrap" />
+                        <TextBlock x:Name="IncidentText" Text="{Binding Incident}" Margin="0,6,0,0" TextWrapping="Wrap" />
                         <TextBlock x:Name="UpdateText" Text="{Binding LatestUpdateText}" Margin="0,6,0,0" TextWrapping="Wrap" MaxHeight="68" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Overlay.TextMuted}" />
                         <ItemsControl ItemsSource="{Binding Components}" ItemTemplate="{StaticResource Component}" Margin="0,10,0,0" Focusable="False">
                             <ItemsControl.ItemsPanel>
