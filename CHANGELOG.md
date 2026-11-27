@@ -9,6 +9,8 @@ The section of a version becomes the text of its GitHub release and is what Meer
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-27
+
 ### Added
 
 - Services widget: watches external services such as GitHub, npm, Docker Hub or Maven Central by
