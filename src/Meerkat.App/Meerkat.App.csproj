@@ -26,6 +26,7 @@
     <ProjectReference Include="..\Meerkat.Abstractions\Meerkat.Abstractions.csproj" />
     <ProjectReference Include="..\Meerkat.Widgets.Docker\Meerkat.Widgets.Docker.csproj" />
     <ProjectReference Include="..\Meerkat.Widgets.Git\Meerkat.Widgets.Git.csproj" />
+    <ProjectReference Include="..\Meerkat.Widgets.Notes\Meerkat.Widgets.Notes.csproj" />
     <ProjectReference Include="..\Meerkat.Widgets.Server\Meerkat.Widgets.Server.csproj" />
   </ItemGroup>
   <ItemGroup>

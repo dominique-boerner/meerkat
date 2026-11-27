@@ -74,6 +74,27 @@
                 </Grid>
             </Border>
         </DataTemplate>
+
+        <DataTemplate x:Key="StatusCard">
+            <Border Background="{StaticResource Overlay.Surface}" CornerRadius="8" Padding="12,8" Margin="0,6,0,0">
+                <StackPanel>
+                    <TextBlock Text="{Binding Title}" FontSize="10.5" Foreground="{StaticResource Overlay.TextMuted}" Margin="0,0,0,2" />
+                    <ItemsControl ItemsSource="{Binding Lines}" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock x:Name="Line" Text="{Binding Text}" Foreground="{StaticResource Overlay.Text}" TextTrimming="CharacterEllipsis" Margin="0,1" />
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding IsDone}" Value="True">
+                                        <Setter TargetName="Line" Property="TextDecorations" Value="Strikethrough" />
+                                        <Setter TargetName="Line" Property="Foreground" Value="{StaticResource Overlay.TextMuted}" />
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
     </Window.Resources>
 
     <!-- Everything is aligned to the top right corner and sized by its content, so the rest of the screen stays free. -->
@@ -115,6 +136,9 @@
                 <TextBlock Text="{Binding MoreHintsText}" Foreground="{StaticResource Overlay.Text}" />
             </StackPanel>
         </Border>
+
+        <!-- Above the hint that points to the panel, which closes the list as its last line. -->
+        <ItemsControl ItemsSource="{Binding Cards}" ItemTemplate="{StaticResource StatusCard}" Focusable="False" />
 
         <Border HorizontalAlignment="Right"
                 Background="{StaticResource Overlay.Surface}"

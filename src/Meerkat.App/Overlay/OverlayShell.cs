@@ -29,6 +29,9 @@ public sealed class OverlayShell(
 {
     private const int TogglePanelHotkeyId = 1;
     private const int ToggleVisibilityHotkeyId = 2;
+
+    // Ids of widget hotkeys start here, clear of the shell's own.
+    private const int FirstWidgetHotkeyId = 100;
     private const double MinimumOpacity = 0.2;
 
     private static readonly TimeSpan WidgetStopTimeout = TimeSpan.FromSeconds(3);
@@ -43,6 +46,7 @@ public sealed class OverlayShell(
     private DispatcherTimer? _ageTimer;
     private string? _hotkeyWarning;
     private bool _isExiting;
+    private int _nextHotkeyId = FirstWidgetHotkeyId;
 
     public async Task StartAsync()
     {
@@ -87,7 +91,10 @@ public sealed class OverlayShell(
     {
         try
         {
-            var hosted = new HostedWidget(widget, new WidgetEntryViewModel(widget.Id, widget.Title, widget.Icon));
+            var hosted = new HostedWidget(
+                widget,
+                new WidgetEntryViewModel(widget.Id, widget.Title, widget.Icon),
+                [.. widget.Hotkeys.Select(hotkey => new HostedHotkey(_nextHotkeyId++, $"{widget.Id}/{hotkey.Id}", hotkey))]);
 
             // Widgets may report from a background thread; everything the shell shows is updated on the UI thread.
             widget.StatusChanged += (_, _) => _statusBarWindow?.Dispatcher.BeginInvoke(RefreshStatus);
@@ -120,6 +127,8 @@ public sealed class OverlayShell(
             }
         }
 
+        // Only running widgets answer their hotkeys.
+        ApplyHotkeys();
         RefreshStatus();
     }
 
@@ -191,7 +200,7 @@ public sealed class OverlayShell(
 
         try
         {
-            return new WidgetReport(hosted.Widget.Status, hosted.Widget.Alerts);
+            return new WidgetReport(hosted.Widget.Status, hosted.Widget.Alerts, hosted.Widget.StatusCard);
         }
         catch (Exception exception)
         {
@@ -298,6 +307,11 @@ public sealed class OverlayShell(
             AppPaths.SettingsFileDisplayPath)
         {
             SuspendHotkeys = hotkeys.Suspend,
+            WidgetHotkeys = [.. _hostedWidgets.SelectMany(hosted => hosted.Hotkeys.Select(hotkey => new WidgetHotkeyViewModel(
+                hotkey.SettingsKey,
+                hotkey.Definition.Title,
+                hosted.Entry.Title,
+                HotkeyGesture.ToDisplayText(GetGestureText(hotkey)))))],
         };
         settingsViewModel.Saved += async (_, _) =>
         {
@@ -350,22 +364,61 @@ public sealed class OverlayShell(
         _statusBarWindow.Opacity = Math.Clamp(current.Opacity, MinimumOpacity, 1.0);
         ApplyBounds();
 
+        ApplyHotkeys();
+        RefreshStatus();
+    }
+
+    private void ApplyHotkeys()
+    {
+        var current = settings.Current;
         var failedHotkeys = new List<string>();
         RegisterHotkey(TogglePanelHotkeyId, current.TogglePanelHotkey, TogglePanel, failedHotkeys);
         RegisterHotkey(ToggleVisibilityHotkeyId, current.ToggleVisibilityHotkey, ToggleVisibility, failedHotkeys);
+        foreach (var hosted in _hostedWidgets)
+        {
+            foreach (var hotkey in hosted.Hotkeys)
+            {
+                if (hosted.IsActive)
+                {
+                    RegisterHotkey(hotkey.NativeId, GetGestureText(hotkey), () => InvokeWidgetHotkey(hosted, hotkey), failedHotkeys);
+                }
+                else
+                {
+                    hotkeys.Unregister(hotkey.NativeId);
+                }
+            }
+        }
+
         state.SetHotkeyTexts(
             HotkeyGesture.ToDisplayText(current.TogglePanelHotkey),
             HotkeyGesture.ToDisplayText(current.ToggleVisibilityHotkey));
 
-        _hotkeyWarning = failedHotkeys.Count > 0
+        var warning = failedHotkeys.Count > 0
             ? $"{string.Join(" and ", failedHotkeys)} could not be registered; another application may already be using it."
             : null;
-        if (_hotkeyWarning is not null)
+
+        // Hotkeys are applied on several occasions; the same warning is announced only once.
+        if (warning is not null && warning != _hotkeyWarning)
         {
-            tray.ShowWarning(_hotkeyWarning);
+            tray.ShowWarning(warning);
         }
 
-        RefreshStatus();
+        _hotkeyWarning = warning;
+    }
+
+    private string GetGestureText(HostedHotkey hotkey) =>
+        settings.Current.WidgetHotkeys.GetValueOrDefault(hotkey.SettingsKey, hotkey.Definition.DefaultGesture);
+
+    private void InvokeWidgetHotkey(HostedWidget hosted, HostedHotkey hotkey)
+    {
+        try
+        {
+            hotkey.Definition.Handler();
+        }
+        catch (Exception exception)
+        {
+            errorLog.Write($"Hotkey '{hotkey.SettingsKey}' of widget '{hosted.Entry.Id}' failed", exception);
+        }
     }
 
     private void ApplyBounds()
@@ -421,11 +474,17 @@ public sealed class OverlayShell(
         Application.Current.Shutdown();
     }
 
-    private sealed class HostedWidget(IOverlayWidget widget, WidgetEntryViewModel entry)
+    /// <param name="NativeId">Id under which the hotkey is registered with Windows.</param>
+    /// <param name="SettingsKey">Key of the user's combination in the settings.</param>
+    private sealed record HostedHotkey(int NativeId, string SettingsKey, WidgetHotkey Definition);
+
+    private sealed class HostedWidget(IOverlayWidget widget, WidgetEntryViewModel entry, IReadOnlyList<HostedHotkey> hotkeys)
     {
         public IOverlayWidget Widget { get; } = widget;
 
         public WidgetEntryViewModel Entry { get; } = entry;
+
+        public IReadOnlyList<HostedHotkey> Hotkeys { get; } = hotkeys;
 
         public bool IsActive { get; set; }
 

@@ -12,6 +12,9 @@ public sealed class OverlaySettings
 
     public string ToggleVisibilityHotkey { get; set; } = "Ctrl+Alt+H";
 
+    /// <summary>Combinations the user chose for hotkeys of widgets, by "widget id/hotkey id"; others use their default.</summary>
+    public Dictionary<string, string> WidgetHotkeys { get; set; } = [];
+
     /// <summary>Opacity of the status bar; the panel is always opaque.</summary>
     public double Opacity { get; set; } = 0.9;
 

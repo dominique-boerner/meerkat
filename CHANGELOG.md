@@ -9,6 +9,15 @@ The section of a version becomes the text of its GitHub release and is what Meer
 
 ## [Unreleased]
 
+### Added
+
+- Notes widget: notes as Markdown files, shown rendered and edited block by block. Its scratchpad
+  collects tasks and quick notes, which you enter from anywhere with `Ctrl+Alt+T` and `Ctrl+Alt+N`.
+  Completed tasks move to an archive note on the next day, and the tasks can be pinned below the
+  status bar.
+- Widgets can offer global hotkeys, which are listed and changed on the Hotkeys page, and can show a
+  card below the status bar.
+
 ## [1.4.0] - 2026-11-27
 
 ### Added

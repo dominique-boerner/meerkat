@@ -67,6 +67,23 @@ public class ShellViewModelTests
     }
 
     [Fact]
+    public void StatusBar_ShowsTheCardsWidgetsKeepInView()
+    {
+        var statusBar = new StatusBarViewModel();
+        var card = new WidgetStatusCard("Tasks · 1 of 2 done", [new WidgetStatusCardLine("Review", IsDone: true), new WidgetStatusCardLine("Check mapping")]);
+
+        statusBar.Update([new WidgetReport(null, [], card), new WidgetReport(null, [])], Now, "Ctrl+Alt+M", notice: null);
+        Assert.Equal([card], statusBar.Cards);
+
+        // A widget without status and alerts shows nothing but its card.
+        Assert.Empty(statusBar.Chips);
+        Assert.False(statusBar.HasAlerts);
+
+        statusBar.Update([new WidgetReport(null, [])], Now, "Ctrl+Alt+M", notice: null);
+        Assert.Empty(statusBar.Cards);
+    }
+
+    [Fact]
     public void StatusBar_LimitsTheNumberOfCards()
     {
         var statusBar = new StatusBarViewModel();

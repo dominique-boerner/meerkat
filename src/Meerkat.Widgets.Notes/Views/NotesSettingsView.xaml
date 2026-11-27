@@ -1,0 +1,34 @@
+<UserControl x:Class="Meerkat.Widgets.Notes.Views.NotesSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel>
+        <TextBlock Style="{DynamicResource Overlay.FormLabel}" Text="Notes folder" />
+        <DockPanel Margin="0,5">
+            <Button DockPanel.Dock="Right" Content="Browse …" Margin="8,0,0,0" Click="OnBrowseClick" />
+            <TextBox Text="{Binding Directory, UpdateSourceTrigger=PropertyChanged}" FontFamily="{DynamicResource Overlay.MonoFont}" />
+        </DockPanel>
+        <TextBlock Style="{DynamicResource Overlay.Hint}"
+                   TextWrapping="Wrap"
+                   Text="Every note is a Markdown file in this folder. Notes are not moved when you choose another folder." />
+
+        <Grid Margin="0,14,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="162" />
+                <ColumnDefinition Width="200" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Style="{DynamicResource Overlay.FormLabel}" Text="Completed tasks" />
+            <ComboBox Grid.Column="1" Margin="0,5"
+                      ItemsSource="{Binding CompletedTaskOptions}"
+                      SelectedItem="{Binding SelectedCompletedTasks}"
+                      DisplayMemberPath="DisplayName" />
+            <TextBlock Grid.Column="2" Style="{DynamicResource Overlay.Hint}" Margin="10,0,0,0" Text="on the next day" />
+        </Grid>
+
+        <CheckBox Margin="0,12,0,0" IsChecked="{Binding PinTasks}" Content="Show the tasks of the scratchpad below the status bar" />
+        <TextBlock Style="{DynamicResource Overlay.Hint}"
+                   Margin="0,10,0,0"
+                   TextWrapping="Wrap"
+                   Text="The hotkeys for a quick note and a new task are set on the Hotkeys page." />
+    </StackPanel>
+</UserControl>

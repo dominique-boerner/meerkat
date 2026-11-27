@@ -17,3 +17,19 @@ public sealed record WidgetStatus(string Label, string Summary, WidgetSeverity S
 /// <summary>Something that needs the user's attention.</summary>
 /// <param name="Since">When the condition was first observed; shown as its age.</param>
 public sealed record WidgetAlert(WidgetSeverity Severity, string Title, string Detail, DateTimeOffset Since);
+
+/// <summary>
+/// Something the user chose to keep in view below the status bar, such as a task list. The status bar
+/// lets clicks through, so a card can only be read, not operated.
+/// </summary>
+public sealed record WidgetStatusCard(string Title, IReadOnlyList<WidgetStatusCardLine> Lines);
+
+/// <param name="IsDone">Shown struck through.</param>
+public sealed record WidgetStatusCardLine(string Text, bool IsDone = false);
+
+/// <summary>A global hotkey a widget offers. The shell registers it and lets the user change the combination.</summary>
+/// <param name="Id">Identifies the hotkey within the widget; the user's combination is stored under it.</param>
+/// <param name="Title">What the hotkey does, shown in the settings.</param>
+/// <param name="DefaultGesture">Combination used until the user chooses another one, e.g. "Ctrl+Alt+N".</param>
+/// <param name="Handler">Called on the UI thread when the hotkey is pressed.</param>
+public sealed record WidgetHotkey(string Id, string Title, string DefaultGesture, Action Handler);

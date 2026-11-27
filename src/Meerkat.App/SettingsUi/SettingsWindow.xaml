@@ -183,6 +183,25 @@
                                              RecordingStopped="OnHotkeyRecordingStopped" />
                             <TextBlock Grid.Row="1" Grid.Column="2" Style="{StaticResource Overlay.Hint}" Margin="10,0,0,0" Text="No polling while hidden" />
                         </Grid>
+                        <ItemsControl ItemsSource="{Binding WidgetHotkeys}" Focusable="False">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="162" />
+                                            <ColumnDefinition Width="142" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Style="{StaticResource Overlay.FormLabel}" Text="{Binding Title}" />
+                                        <local:HotkeyBox Grid.Column="1" Margin="0,5"
+                                                         Hotkey="{Binding Gesture}"
+                                                         RecordingStarted="OnHotkeyRecordingStarted"
+                                                         RecordingStopped="OnHotkeyRecordingStopped" />
+                                        <TextBlock Grid.Column="2" Style="{StaticResource Overlay.Hint}" Margin="10,0,0,0" Text="{Binding WidgetTitle, StringFormat={}{0} widget}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                         <TextBlock Style="{StaticResource Overlay.Hint}"
                                    Margin="0,6,0,0"
                                    Text="Click a field and press the new key combination. Esc keeps the current one." />

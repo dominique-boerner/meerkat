@@ -29,6 +29,20 @@ public sealed partial class WidgetToggleViewModel(string id, string title, strin
     public string TypeName { get; } = typeName;
 }
 
+/// <summary>A hotkey offered by a widget, as edited in the settings.</summary>
+/// <param name="settingsKey">Key under which the chosen combination is stored.</param>
+public sealed partial class WidgetHotkeyViewModel(string settingsKey, string title, string widgetTitle, string gesture) : ObservableObject
+{
+    [ObservableProperty]
+    private string _gesture = gesture;
+
+    public string SettingsKey { get; } = settingsKey;
+
+    public string Title { get; } = title;
+
+    public string WidgetTitle { get; } = widgetTitle;
+}
+
 public sealed partial class SettingsViewModel : ObservableObject
 {
     private static readonly string[] ShellSectionTitles = ["Hotkeys", "Appearance", "Widgets"];
@@ -114,6 +128,8 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public IReadOnlyList<WidgetToggleViewModel> Widgets { get; }
 
+    public IReadOnlyList<WidgetHotkeyViewModel> WidgetHotkeys { get; init; } = [];
+
     public IReadOnlyList<WidgetSettingsSection> WidgetSections { get; }
 
     public UpdateViewModel Update { get; }
@@ -131,9 +147,21 @@ public sealed partial class SettingsViewModel : ObservableObject
             return false;
         }
 
-        if (togglePanel == toggleVisibility)
+        var gestures = new List<HotkeyGesture> { togglePanel, toggleVisibility };
+        foreach (var hotkey in WidgetHotkeys)
         {
-            ErrorMessage = "The two hotkeys must differ.";
+            if (!HotkeyGesture.TryParse(hotkey.Gesture, out var gesture))
+            {
+                ErrorMessage = "Hotkeys need at least one modifier and a key, e.g. Ctrl+Alt+O.";
+                return false;
+            }
+
+            gestures.Add(gesture);
+        }
+
+        if (gestures.Distinct().Count() != gestures.Count)
+        {
+            ErrorMessage = "Every hotkey needs its own combination.";
             return false;
         }
 
@@ -147,6 +175,11 @@ public sealed partial class SettingsViewModel : ObservableObject
             var current = _settings.Current;
             current.TogglePanelHotkey = togglePanel.ToString();
             current.ToggleVisibilityHotkey = toggleVisibility.ToString();
+            foreach (var hotkey in WidgetHotkeys)
+            {
+                current.WidgetHotkeys[hotkey.SettingsKey] = HotkeyGesture.ToDisplayText(hotkey.Gesture);
+            }
+
             current.Opacity = Opacity;
             current.Monitor = SelectedMonitor.DeviceName;
             current.DisabledWidgets = [.. Widgets.Where(widget => !widget.IsEnabled).Select(widget => widget.Id)];

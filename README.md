@@ -60,6 +60,15 @@ inside WSL, for GitLab and GitHub, and for servers reachable over SSH.
   until you have verified the new one
 - Opens a terminal session on a host with one click
 
+**Notes widget**
+
+- Notes as plain Markdown files in a folder of your choice, shown rendered and edited block by block
+- A scratchpad that collects tasks and quick notes; a global hotkey opens a small input field above
+  whatever you are working on, so you never have to leave it to write something down
+- Quick notes are stamped with the time and grouped by day; completed tasks are tidied up on the
+  next day
+- Optionally keeps the tasks in view below the status bar
+
 ## Requirements
 
 | | |
@@ -68,7 +77,7 @@ inside WSL, for GitLab and GitHub, and for servers reachable over SSH.
 | Runtime | [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) (not needed for the self-contained download) |
 | Docker widget | WSL 2 with Docker Engine installed **inside** a distribution. Docker Desktop is not required. |
 | Git widget | A personal access token for GitLab (gitlab.com or self-managed) or GitHub (github.com or Enterprise Server) |
-| Server widget | The OpenSSH client that ships with Windows (`ssh.exe`) and key-based access to the hosts; the hosts must run Linux |
+| Server widget | The OpenSSH client that ships with Windows (`ssh.exe`) and SSH access to the hosts; the hosts must run Linux |
 
 ## Installation
 
@@ -85,6 +94,8 @@ Meerkat shows its status bar in the top right corner and adds an icon to the not
 |---|---|
 | Open or close the panel | `Ctrl+Alt+M` |
 | Hide or show Meerkat | `Ctrl+Alt+H` |
+| Write a quick note | `Ctrl+Alt+N` |
+| Add a task | `Ctrl+Alt+T` |
 
 The panel stays open while you work in other windows. It closes when you press `Esc` inside it,
 press the hotkey again or use its close button. Drag its left edge to change the width, for example to read long log
@@ -154,6 +165,26 @@ Each check is a single SSH call that reads `/proc`, `df` and `systemctl is-activ
 installed or changed on the host. Per host you can list the systemd services to watch, set the check
 interval and the disk usage at which Meerkat shows a hint or an error.
 
+### Notes widget
+
+Every note is a Markdown file in `Documents\Meerkat\Notes`; the folder can be changed in the
+settings. The page in the panel shows a note rendered. Click a block to edit its Markdown, click
+elsewhere or press `Esc` to finish; check boxes can be ticked directly. Changes are saved right away,
+and changes made to the files by other programs show up on their own.
+
+The *scratchpad* is always there and cannot be deleted. It has two sections that Meerkat writes to:
+
+- `Ctrl+Alt+T` opens an input field for a task, which is appended to **Tasks**.
+- `Ctrl+Alt+N` opens the same field for a quick note, which goes on top of **Quick notes** with the
+  time of day. Start the text with `[]` or `- ` to make it a task instead.
+
+Press `Enter` to save and `Esc` to discard. Below those two sections the scratchpad is yours; Meerkat
+never changes anything there. If you remove one of the headings, it is created again with the next
+entry. Tasks you completed stay visible for the rest of the day and move to `archive.md` on the next
+one, or are deleted if you prefer that.
+
+The pin button of the scratchpad shows its tasks below the status bar.
+
 ## Building from source
 
 You need the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) or newer.
@@ -175,6 +206,7 @@ dotnet run --project src/Meerkat.App
 | `src/Meerkat.Widgets.Docker` | The Docker widget |
 | `src/Meerkat.Widgets.Git` | The Git widget for GitLab and GitHub |
 | `src/Meerkat.Widgets.Server` | The Server widget for machines reachable over SSH |
+| `src/Meerkat.Widgets.Notes` | The Notes widget with the scratchpad |
 | `tests/Meerkat.Tests` | Unit tests (xUnit) |
 
 ### Test environment for the Docker widget

@@ -25,7 +25,13 @@ public interface IOverlayWidget
     /// <summary>Conditions that need attention right now. Errors appear in the status bar, warnings in the panel.</summary>
     IReadOnlyList<WidgetAlert> Alerts => [];
 
-    /// <summary>Raise whenever <see cref="Status"/> or <see cref="Alerts"/> changed.</summary>
+    /// <summary>Optional card shown below the status bar, or null if the widget keeps nothing in view.</summary>
+    WidgetStatusCard? StatusCard => null;
+
+    /// <summary>Global hotkeys of the widget. Read once when the widget is registered.</summary>
+    IReadOnlyList<WidgetHotkey> Hotkeys => [];
+
+    /// <summary>Raise whenever <see cref="Status"/>, <see cref="Alerts"/> or <see cref="StatusCard"/> changed.</summary>
     event EventHandler? StatusChanged
     {
         add { }

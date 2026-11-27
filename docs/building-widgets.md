@@ -115,7 +115,9 @@ public sealed class DiskWidget(IOverlayState overlayState) : IOverlayWidget
 | `HeaderView` | Optional content above the page, for example a summary and buttons. |
 | `Status` | The widget's chip in the status bar: a label, a compact figure and a severity. Return null while there is nothing to report. |
 | `Alerts` | Conditions that need attention right now. |
-| `StatusChanged` | Raise it whenever `Status` or `Alerts` changed. It may be raised from any thread. |
+| `StatusCard` | Optional card below the status bar for something the user chose to keep in view, see [Status cards and hotkeys](#status-cards-and-hotkeys). |
+| `Hotkeys` | Optional global hotkeys, see [Status cards and hotkeys](#status-cards-and-hotkeys). |
+| `StatusChanged` | Raise it whenever `Status`, `Alerts` or `StatusCard` changed. It may be raised from any thread. |
 | `SettingsPage` | Optional settings editor, see [Settings](#settings). |
 | `StartAsync` / `StopAsync` | Called when the widget is enabled, disabled or restarted, and on shutdown. Both run on the UI thread. |
 
@@ -160,6 +162,27 @@ Choose severities with that in mind:
 - Set `Since` to the moment the condition was first observed and keep it stable across refreshes; the
   shell shows it as the alert's age and uses it to order cards.
 - Show the same problem on your page, with the actions to resolve it. The status bar cannot be clicked.
+
+## Status cards and hotkeys
+
+A widget can keep something in view below the status bar by returning a `WidgetStatusCard`: a title
+and a few lines, each optionally struck through. Only do this on the user's request, for example
+behind a pin button, and return null otherwise. The status bar lets clicks through, so a card can be
+read but not operated.
+
+A widget can also offer global hotkeys:
+
+```csharp
+public IReadOnlyList<WidgetHotkey> Hotkeys =>
+[
+    new("quick-note", "Quick note", "Ctrl+Alt+N", ShowCaptureWindow),
+];
+```
+
+The shell registers them while the widget is enabled, lists them on the *Hotkeys* page of the
+settings so the user can change the combination, and calls the handler on the UI thread. The id
+identifies the hotkey in the stored settings, so keep it stable. A hotkey should do something that is
+worth interrupting the user's work for, such as opening a window of your own for a quick entry.
 
 ## Services provided by the shell
 
@@ -240,3 +263,7 @@ HTTP layer with canned responses.
 `src/Meerkat.Widgets.Server` monitors several independent targets: one polling loop per host with its
 own interval, alerts that keep the time a problem started, a list that sorts itself by severity, and
 a settings page with a list and an edit form.
+
+`src/Meerkat.Widgets.Notes` works without any polling: it keeps its data in files, watches them for
+changes made elsewhere, offers global hotkeys with a window of its own, and pins a card below the
+status bar.

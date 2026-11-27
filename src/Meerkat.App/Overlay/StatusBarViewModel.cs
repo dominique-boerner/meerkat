@@ -9,7 +9,7 @@ public sealed record StatusChipViewModel(string Label, string Summary, WidgetSev
 public sealed record AlertCardViewModel(string Title, string Detail, string AgeText);
 
 /// <summary>What one widget currently reports to the shell.</summary>
-public sealed record WidgetReport(WidgetStatus? Status, IReadOnlyList<WidgetAlert> Alerts);
+public sealed record WidgetReport(WidgetStatus? Status, IReadOnlyList<WidgetAlert> Alerts, WidgetStatusCard? Card = null);
 
 /// <summary>
 /// Backs the always-visible status bar: one chip per widget, plus a card for every error. Warnings are
@@ -39,12 +39,17 @@ public sealed partial class StatusBarViewModel : ObservableObject
 
     public ObservableCollection<AlertCardViewModel> Alerts { get; } = [];
 
+    /// <summary>What widgets keep in view on the user's request, shown below everything that reports a problem.</summary>
+    public ObservableCollection<WidgetStatusCard> Cards { get; } = [];
+
     public void Update(IReadOnlyList<WidgetReport> reports, DateTimeOffset now, string panelHotkeyText, string? notice)
     {
         Replace(Chips, reports
             .Select(report => report.Status)
             .OfType<WidgetStatus>()
             .Select(status => new StatusChipViewModel(status.Label, status.Summary, status.Severity)));
+
+        Replace(Cards, reports.Select(report => report.Card).OfType<WidgetStatusCard>());
 
         var alerts = reports.SelectMany(report => report.Alerts).ToList();
         var errors = alerts.Where(alert => alert.Severity == WidgetSeverity.Error).OrderBy(alert => alert.Since).ToList();
