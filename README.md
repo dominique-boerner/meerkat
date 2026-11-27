@@ -88,7 +88,8 @@ inside WSL, for GitLab and GitHub, for servers reachable over SSH, and for notes
    - `Meerkat-<version>-win-x64-self-contained.zip` bundles the runtime
 2. Extract it anywhere and run `Meerkat.exe`.
 
-Meerkat shows its status bar in the top right corner and adds an icon to the notification area.
+Meerkat shows its status bar in the top right corner, from where you can move it anywhere, and adds
+an icon to the notification area.
 
 ## Usage
 
@@ -100,7 +101,9 @@ Meerkat shows its status bar in the top right corner and adds an icon to the not
 | Add a task | `Ctrl+Alt+T` |
 
 Click the status bar to open or close the panel, or click a card to open the panel on the page it
-belongs to. The panel stays open while you work in other windows. It closes when you press `Esc` inside it,
+belongs to. Drag the status bar by the handle at its end to move it, for example away from the buttons of maximized windows;
+its place is remembered relative to the screen, so it is the same on every monitor and resolution.
+The panel stays open while you work in other windows. It closes when you press `Esc` inside it,
 press the hotkey again or use its close button. Drag its left edge to change the width, for example to read long log
 lines; a double-click on the edge restores the default. Both actions are also available from the tray icon.
 

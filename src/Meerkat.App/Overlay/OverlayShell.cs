@@ -51,6 +51,7 @@ public sealed class OverlayShell(
     public async Task StartAsync()
     {
         _statusBarWindow = new StatusBarWindow { DataContext = statusBar };
+        _statusBarWindow.PositionChanged += (_, position) => SaveStatusBarPosition(position.X, position.Y);
         _panelWindow = new PanelWindow { DataContext = panel };
         _panelWindow.Dismissed += (_, _) => SetPanelOpen(false);
         _panelWindow.WidthRequested += (_, width) => ResizePanel(width);
@@ -225,7 +226,7 @@ public sealed class OverlayShell(
         }
     }
 
-private void TogglePanel() => SetPanelOpen(!state.IsPanelOpen);
+    private void TogglePanel() => SetPanelOpen(!state.IsPanelOpen);
 
     /// <summary>Opens the panel on the page of a widget; without an id the panel opens where it was left.</summary>
     private void ShowWidget(string? widgetId)
@@ -275,6 +276,20 @@ private void TogglePanel() => SetPanelOpen(!state.IsPanelOpen);
         catch (Exception exception)
         {
             errorLog.Write("Saving the panel width failed", exception);
+        }
+    }
+
+    private void SaveStatusBarPosition(double x, double y)
+    {
+        settings.Current.StatusBarX = x;
+        settings.Current.StatusBarY = y;
+        try
+        {
+            settings.Save();
+        }
+        catch (Exception exception)
+        {
+            errorLog.Write("Saving the status bar position failed", exception);
         }
     }
 
@@ -376,6 +391,7 @@ private void TogglePanel() => SetPanelOpen(!state.IsPanelOpen);
 
         var current = settings.Current;
         _statusBarWindow.Opacity = Math.Clamp(current.Opacity, MinimumOpacity, 1.0);
+        _statusBarWindow.SetPosition(current.StatusBarX, current.StatusBarY);
         ApplyBounds();
 
         ApplyHotkeys();

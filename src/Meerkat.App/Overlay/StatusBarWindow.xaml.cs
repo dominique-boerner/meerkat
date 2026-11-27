@@ -1,4 +1,6 @@
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Threading;
 using Meerkat.App.Interop;
@@ -11,9 +13,31 @@ namespace Meerkat.App.Overlay;
 /// </summary>
 public partial class StatusBarWindow : Window
 {
+    // Gap between the bar and the cards, which each card brings along as its top margin.
+    private const double CardGap = 6;
+
+    private double _positionX = StatusBarPlacement.DefaultX;
+    private double _positionY = StatusBarPlacement.DefaultY;
+
+    private Point? _dragStartCursor;
+    private Point _dragStartBar;
+    private bool _hasMoved;
+
     public StatusBarWindow()
     {
         InitializeComponent();
+        SizeChanged += (_, _) => ApplyPlacement();
+    }
+
+    /// <summary>Raised when the user has dragged the bar by its handle to a new place, with the position as fractions of the screen.</summary>
+    public event EventHandler<(double X, double Y)>? PositionChanged;
+
+    /// <summary>Places the bar; see <see cref="StatusBarPlacement"/> for the meaning of the two fractions.</summary>
+    public void SetPosition(double x, double y)
+    {
+        _positionX = x;
+        _positionY = y;
+        ApplyPlacement();
     }
 
     /// <summary>Positions the window using physical pixels of the virtual screen.</summary>
@@ -46,5 +70,63 @@ public partial class StatusBarWindow : Window
         var style = NativeMethods.GetWindowLongPtr(handle, NativeMethods.GwlExStyle).ToInt64();
         style |= NativeMethods.WsExNoActivate | NativeMethods.WsExToolWindow;
         NativeMethods.SetWindowLongPtr(handle, NativeMethods.GwlExStyle, new IntPtr(style));
+    }
+
+    private void OnBarSizeChanged(object sender, SizeChangedEventArgs e) => ApplyPlacement();
+
+    private void ApplyPlacement()
+    {
+        if (ActualWidth <= 0 || Bar.ActualWidth <= 0)
+        {
+            return;
+        }
+
+        var placement = StatusBarPlacement.Compute(_positionX, _positionY, new Size(ActualWidth, ActualHeight), Bar.RenderSize);
+        var horizontal = placement.GrowsLeft ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+        Group.HorizontalAlignment = horizontal;
+        Group.VerticalAlignment = placement.GrowsUp ? VerticalAlignment.Bottom : VerticalAlignment.Top;
+        Group.Margin = placement.Margin;
+        Bar.HorizontalAlignment = horizontal;
+        NoticeButton.HorizontalAlignment = horizontal;
+
+        // Above the bar the gap belongs below the last card instead of above the first one.
+        var dock = placement.GrowsUp ? Dock.Bottom : Dock.Top;
+        DockPanel.SetDock(Bar, dock);
+        DockPanel.SetDock(CardsPanel, dock);
+        CardsPanel.Margin = placement.GrowsUp ? new Thickness(0, -CardGap, 0, CardGap) : default;
+    }
+
+    // Marking the press as handled keeps it from the bar, which would otherwise take it as the start of a click.
+    private void OnGripMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        _dragStartCursor = e.GetPosition(this);
+        _dragStartBar = Bar.TranslatePoint(default, this);
+        _hasMoved = false;
+        Grip.CaptureMouse();
+        e.Handled = true;
+    }
+
+    private void OnGripMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_dragStartCursor is not { } start || !Grip.IsMouseCaptured)
+        {
+            return;
+        }
+
+        var offset = e.GetPosition(this) - start;
+        _hasMoved = true;
+        (_positionX, _positionY) = StatusBarPlacement.FromBarPosition(_dragStartBar + offset, new Size(ActualWidth, ActualHeight), Bar.RenderSize);
+        ApplyPlacement();
+    }
+
+    private void OnGripMouseUp(object sender, MouseButtonEventArgs e)
+    {
+        _dragStartCursor = null;
+        Grip.ReleaseMouseCapture();
+        e.Handled = true;
+        if (_hasMoved)
+        {
+            PositionChanged?.Invoke(this, (_positionX, _positionY));
+        }
     }
 }

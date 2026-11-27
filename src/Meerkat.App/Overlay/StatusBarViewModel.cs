@@ -45,7 +45,7 @@ public sealed partial class StatusBarViewModel : ObservableObject
     public ObservableCollection<AlertCardViewModel> Alerts { get; } = [];
 
     /// <summary>What widgets keep in view on the user's request, shown below everything that reports a problem.</summary>
-public ObservableCollection<StatusCardViewModel> Cards { get; } = [];
+    public ObservableCollection<StatusCardViewModel> Cards { get; } = [];
 
     /// <summary>Raised when a card was clicked, with the id of the widget whose page should be shown, if any.</summary>
     public event EventHandler<string?>? WidgetRequested;

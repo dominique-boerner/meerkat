@@ -251,6 +251,8 @@
                                       DisplayMemberPath="DisplayName" />
                         </Grid>
                         <TextBlock Style="{StaticResource Overlay.Hint}" Margin="162,2,0,0" Text="Status bar and panel appear on this monitor" />
+                        <TextBlock Style="{StaticResource Overlay.Hint}" Margin="162,8,0,0" TextWrapping="Wrap"
+                                   Text="To move the status bar, drag it by the handle at its end. Its place is remembered relative to the screen, so it fits every monitor." />
                     </StackPanel>
 
                     <StackPanel x:Name="WidgetsSection">

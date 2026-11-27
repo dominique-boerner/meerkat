@@ -24,6 +24,9 @@ The section of a version becomes the text of its GitHub release and is what Meer
   opens the panel on the page of the widget it belongs to. Clicking does not take the keyboard focus
   from the application you work in, and a slight highlight shows what can be clicked.
 - The "Details" hint below the cards is gone. The hotkey is shown as a tooltip of the logo instead.
+- The status bar can be dragged by a handle to any place on the screen. The place is stored relative to the
+  screen size, and the cards open towards the middle of the screen: below or above the bar, to the
+  left or to the right.
 
 ## [1.4.0] - 2026-11-27
 

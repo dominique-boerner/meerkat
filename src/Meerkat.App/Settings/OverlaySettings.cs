@@ -15,6 +15,14 @@ public sealed class OverlaySettings
     /// <summary>Combinations the user chose for hotkeys of widgets, by "widget id/hotkey id"; others use their default.</summary>
     public Dictionary<string, string> WidgetHotkeys { get; set; } = [];
 
+    /// <summary>
+    /// Position of the status bar as fractions of the screen, from 0/0 for the top left to 1/1 for the bottom
+    /// right corner; the user changes it by dragging the bar.
+    /// </summary>
+    public double StatusBarX { get; set; } = 1;
+
+    public double StatusBarY { get; set; }
+
     /// <summary>Opacity of the status bar; the panel is always opaque.</summary>
     public double Opacity { get; set; } = 0.9;
 
