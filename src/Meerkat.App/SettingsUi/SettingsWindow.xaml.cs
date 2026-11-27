@@ -1,21 +1,17 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
-using Meerkat.App.Hotkeys;
 
 namespace Meerkat.App.SettingsUi;
 
 public partial class SettingsWindow : Window
 {
-    private static readonly Key[] ModifierOnlyKeys =
-    [
-        Key.LeftCtrl, Key.RightCtrl, Key.LeftAlt, Key.RightAlt, Key.LeftShift, Key.RightShift, Key.LWin, Key.RWin,
-    ];
+    private IDisposable? _hotkeySuspension;
 
     public SettingsWindow()
     {
         InitializeComponent();
         Loaded += (_, _) => ShowSelectedSection();
+        Closed += (_, _) => ResumeHotkeys();
     }
 
     private void OnSaveClick(object sender, RoutedEventArgs e)
@@ -28,20 +24,17 @@ public partial class SettingsWindow : Window
 
     private void OnCancelClick(object sender, RoutedEventArgs e) => Close();
 
-    private void OnHotkeyBoxKeyDown(object sender, KeyEventArgs e)
-    {
-        // Alt combinations arrive as Key.System with the real key in SystemKey.
-        var key = e.Key == Key.System ? e.SystemKey : e.Key;
-        if (key == Key.Tab || ModifierOnlyKeys.Contains(key))
-        {
-            return;
-        }
+    // Windows swallows a registered hotkey, so Meerkat's own hotkeys are released while one is being
+    // recorded. Otherwise pressing the current combination would trigger it instead of reaching the field.
+    private void OnHotkeyRecordingStarted(object? sender, EventArgs e) =>
+        _hotkeySuspension ??= (DataContext as SettingsViewModel)?.SuspendHotkeys?.Invoke();
 
-        e.Handled = true;
-        if (Keyboard.Modifiers != ModifierKeys.None && sender is TextBox textBox)
-        {
-            textBox.Text = new HotkeyGesture(Keyboard.Modifiers, key).ToString();
-        }
+    private void OnHotkeyRecordingStopped(object? sender, EventArgs e) => ResumeHotkeys();
+
+    private void ResumeHotkeys()
+    {
+        _hotkeySuspension?.Dispose();
+        _hotkeySuspension = null;
     }
 
     private void OnNavigationSelectionChanged(object sender, SelectionChangedEventArgs e) => ShowSelectedSection();

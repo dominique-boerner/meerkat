@@ -98,6 +98,9 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public event EventHandler? Saved;
 
+    /// <summary>Releases the application's global hotkeys while the user records a new one.</summary>
+    public Func<IDisposable>? SuspendHotkeys { get; init; }
+
     /// <summary>Shell sections first, then one entry per widget settings page, then the update page.</summary>
     public IReadOnlyList<NavigationItem> NavigationItems { get; }
 

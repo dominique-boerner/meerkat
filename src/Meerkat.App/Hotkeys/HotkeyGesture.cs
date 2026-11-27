@@ -44,35 +44,56 @@ public readonly record struct HotkeyGesture(ModifierKeys Modifiers, Key Key)
         return true;
     }
 
+    private static readonly Key[] ModifierOnlyKeys =
+    [
+        Key.LeftCtrl, Key.RightCtrl, Key.LeftAlt, Key.RightAlt, Key.LeftShift, Key.RightShift, Key.LWin, Key.RWin,
+    ];
+
+    /// <summary>
+    /// Builds a gesture from a key press. A global hotkey needs a modifier and a key that is not itself
+    /// a modifier; anything else would fire during normal typing.
+    /// </summary>
+    public static bool TryCreate(Key key, ModifierKeys modifiers, out HotkeyGesture gesture)
+    {
+        gesture = new HotkeyGesture(modifiers, key);
+        return modifiers != ModifierKeys.None && key != Key.None && !ModifierOnlyKeys.Contains(key);
+    }
+
+    /// <summary>The held modifiers as text, e.g. "Ctrl+Alt"; empty when none is held.</summary>
+    public static string FormatModifiers(ModifierKeys modifiers)
+    {
+        var parts = new List<string>();
+        if (modifiers.HasFlag(ModifierKeys.Control))
+        {
+            parts.Add("Ctrl");
+        }
+
+        if (modifiers.HasFlag(ModifierKeys.Alt))
+        {
+            parts.Add("Alt");
+        }
+
+        if (modifiers.HasFlag(ModifierKeys.Shift))
+        {
+            parts.Add("Shift");
+        }
+
+        if (modifiers.HasFlag(ModifierKeys.Windows))
+        {
+            parts.Add("Win");
+        }
+
+        return string.Join('+', parts);
+    }
+
     /// <summary>Normalizes stored text for display; falls back to the raw text if it cannot be parsed.</summary>
     public static string ToDisplayText(string storedText) =>
         TryParse(storedText, out var gesture) ? gesture.ToString() : storedText;
 
     public override string ToString()
     {
-        var parts = new List<string>();
-        if (Modifiers.HasFlag(ModifierKeys.Control))
-        {
-            parts.Add("Ctrl");
-        }
-
-        if (Modifiers.HasFlag(ModifierKeys.Alt))
-        {
-            parts.Add("Alt");
-        }
-
-        if (Modifiers.HasFlag(ModifierKeys.Shift))
-        {
-            parts.Add("Shift");
-        }
-
-        if (Modifiers.HasFlag(ModifierKeys.Windows))
-        {
-            parts.Add("Win");
-        }
-
-        parts.Add(Key is >= Key.D0 and <= Key.D9 ? ((int)(Key - Key.D0)).ToString() : Key.ToString());
-        return string.Join('+', parts);
+        var keyName = Key is >= Key.D0 and <= Key.D9 ? ((int)(Key - Key.D0)).ToString() : Key.ToString();
+        return Modifiers == ModifierKeys.None ? keyName : $"{FormatModifiers(Modifiers)}+{keyName}";
     }
 
     private static bool TryParseKey(string text, out Key key)

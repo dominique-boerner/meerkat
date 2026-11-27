@@ -28,6 +28,30 @@ public class HotkeyGestureTests
         Assert.False(HotkeyGesture.TryParse(text, out _));
     }
 
+    [Theory]
+    [InlineData(Key.M, ModifierKeys.Control | ModifierKeys.Alt, true)]
+    [InlineData(Key.F9, ModifierKeys.Shift, true)]
+    [InlineData(Key.M, ModifierKeys.None, false)]
+    [InlineData(Key.LeftCtrl, ModifierKeys.Control, false)]
+    [InlineData(Key.RWin, ModifierKeys.Windows | ModifierKeys.Alt, false)]
+    [InlineData(Key.None, ModifierKeys.Control, false)]
+    public void TryCreate_NeedsAModifierAndARealKey(Key key, ModifierKeys modifiers, bool expected)
+    {
+        Assert.Equal(expected, HotkeyGesture.TryCreate(key, modifiers, out var gesture));
+        if (expected)
+        {
+            Assert.Equal(new HotkeyGesture(modifiers, key), gesture);
+        }
+    }
+
+    [Fact]
+    public void FormatModifiers_ListsHeldModifiersInAFixedOrder()
+    {
+        Assert.Equal("Ctrl+Alt+Shift+Win", HotkeyGesture.FormatModifiers(ModifierKeys.Windows | ModifierKeys.Shift | ModifierKeys.Alt | ModifierKeys.Control));
+        Assert.Equal("Alt", HotkeyGesture.FormatModifiers(ModifierKeys.Alt));
+        Assert.Equal(string.Empty, HotkeyGesture.FormatModifiers(ModifierKeys.None));
+    }
+
     [Fact]
     public void ToString_RoundTripsThroughTryParse()
     {

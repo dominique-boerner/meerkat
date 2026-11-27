@@ -274,7 +274,10 @@ public sealed class OverlayShell(
             CreateSettingsSections(),
             updateViewModel,
             _hotkeyWarning,
-            AppPaths.SettingsFileDisplayPath);
+            AppPaths.SettingsFileDisplayPath)
+        {
+            SuspendHotkeys = hotkeys.Suspend,
+        };
         settingsViewModel.Saved += async (_, _) =>
         {
             ApplySettings();

@@ -1,6 +1,7 @@
 <Window x:Class="Meerkat.App.SettingsUi.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Meerkat.App.SettingsUi"
         Title="Meerkat – Settings"
         Icon="/Assets/meerkat-app.ico"
         Width="800"
@@ -30,6 +31,51 @@
                          Visibility="{Binding Badge.HasUpdate, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
             </StackPanel>
         </DataTemplate>
+        <Style TargetType="local:HotkeyBox">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="ToolTip" Value="Click, then press the new key combination. Esc cancels." />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="local:HotkeyBox">
+                        <Border x:Name="Chrome"
+                                Background="{StaticResource Overlay.SurfaceRaised}"
+                                BorderBrush="{StaticResource Overlay.Border}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="8,5">
+                            <DockPanel>
+                                <TextBlock x:Name="Icon"
+                                           DockPanel.Dock="Right"
+                                           Text="&#xE765;"
+                                           FontFamily="{StaticResource Overlay.IconFont}"
+                                           VerticalAlignment="Center"
+                                           Foreground="{StaticResource Overlay.TextMuted}" />
+                                <TextBlock x:Name="Label"
+                                           Text="{TemplateBinding DisplayText}"
+                                           FontFamily="{StaticResource Overlay.MonoFont}"
+                                           Foreground="{StaticResource Overlay.Text}"
+                                           TextTrimming="CharacterEllipsis" />
+                            </DockPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Overlay.Hover}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource Overlay.TextMuted}" />
+                            </Trigger>
+                            <Trigger Property="IsRecording" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource Overlay.Accent}" />
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Overlay.Hover}" />
+                                <Setter TargetName="Label" Property="Foreground" Value="{StaticResource Overlay.Accent}" />
+                                <Setter TargetName="Icon" Property="Foreground" Value="{StaticResource Overlay.Accent}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="LinkButton" TargetType="Button">
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Foreground" Value="{StaticResource Overlay.Accent}" />
@@ -124,23 +170,22 @@
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource Overlay.FormLabel}" Text="Open/close panel" />
-                            <TextBox Grid.Row="0" Grid.Column="1" Margin="0,5"
-                                     IsReadOnly="True"
-                                     FontFamily="{StaticResource Overlay.MonoFont}"
-                                     ToolTip="Click the field and press the desired key combination"
-                                     Text="{Binding TogglePanelHotkey, UpdateSourceTrigger=PropertyChanged}"
-                                     PreviewKeyDown="OnHotkeyBoxKeyDown" />
+                            <local:HotkeyBox Grid.Row="0" Grid.Column="1" Margin="0,5"
+                                             Hotkey="{Binding TogglePanelHotkey}"
+                                             RecordingStarted="OnHotkeyRecordingStarted"
+                                             RecordingStopped="OnHotkeyRecordingStopped" />
                             <TextBlock Grid.Row="0" Grid.Column="2" Style="{StaticResource Overlay.Hint}" Margin="10,0,0,0" Text="Details and actions" />
 
                             <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource Overlay.FormLabel}" Text="Show/hide Meerkat" />
-                            <TextBox Grid.Row="1" Grid.Column="1" Margin="0,5"
-                                     IsReadOnly="True"
-                                     FontFamily="{StaticResource Overlay.MonoFont}"
-                                     ToolTip="Click the field and press the desired key combination"
-                                     Text="{Binding ToggleVisibilityHotkey, UpdateSourceTrigger=PropertyChanged}"
-                                     PreviewKeyDown="OnHotkeyBoxKeyDown" />
+                            <local:HotkeyBox Grid.Row="1" Grid.Column="1" Margin="0,5"
+                                             Hotkey="{Binding ToggleVisibilityHotkey}"
+                                             RecordingStarted="OnHotkeyRecordingStarted"
+                                             RecordingStopped="OnHotkeyRecordingStopped" />
                             <TextBlock Grid.Row="1" Grid.Column="2" Style="{StaticResource Overlay.Hint}" Margin="10,0,0,0" Text="No polling while hidden" />
                         </Grid>
+                        <TextBlock Style="{StaticResource Overlay.Hint}"
+                                   Margin="0,6,0,0"
+                                   Text="Click a field and press the new key combination. Esc keeps the current one." />
                         <DockPanel Margin="0,4,0,0">
                             <DockPanel.Style>
                                 <Style TargetType="DockPanel">
