@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Meerkat.Abstractions;
 using Meerkat.App.Hotkeys;
 using Meerkat.App.Settings;
+using Meerkat.App.Startup;
 using Meerkat.App.Updates;
 
 namespace Meerkat.App.SettingsUi;
@@ -45,9 +46,10 @@ public sealed partial class WidgetHotkeyViewModel(string settingsKey, string tit
 
 public sealed partial class SettingsViewModel : ObservableObject
 {
-    private static readonly string[] ShellSectionTitles = ["Hotkeys", "Appearance", "Widgets"];
+    private static readonly string[] ShellSectionTitles = ["Hotkeys", "General", "Widgets"];
 
     private readonly SettingsService _settings;
+    private readonly IAutostart? _autostart;
 
     [ObservableProperty]
     private string _togglePanelHotkey;
@@ -61,6 +63,9 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private MonitorOption _selectedMonitor;
+
+    [ObservableProperty]
+    private bool _startWithWindows;
 
     [ObservableProperty]
     private bool _checkForUpdatesAutomatically;
@@ -130,6 +135,19 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public IReadOnlyList<WidgetHotkeyViewModel> WidgetHotkeys { get; init; } = [];
 
+    /// <summary>Switches the start with Windows on and off; without it the option is not offered.</summary>
+    public IAutostart? Autostart
+    {
+        get => _autostart;
+        init
+        {
+            _autostart = value;
+            StartWithWindows = value?.IsEnabled ?? false;
+        }
+    }
+
+    public bool CanStartWithWindows => _autostart is not null;
+
     public IReadOnlyList<WidgetSettingsSection> WidgetSections { get; }
 
     public UpdateViewModel Update { get; }
@@ -187,6 +205,12 @@ public sealed partial class SettingsViewModel : ObservableObject
             current.Updates.DownloadInBackground = DownloadUpdatesInBackground;
             current.Updates.Channel = SelectedChannel.Channel;
             _settings.Save();
+
+            // Only touched when changed: the entry may belong to another copy of Meerkat.
+            if (_autostart is not null && _autostart.IsEnabled != StartWithWindows)
+            {
+                _autostart.SetEnabled(StartWithWindows);
+            }
         }
         catch (Exception exception)
         {

@@ -5,6 +5,7 @@ using Meerkat.App.Diagnostics;
 using Meerkat.App.Hotkeys;
 using Meerkat.App.Overlay;
 using Meerkat.App.Settings;
+using Meerkat.App.Startup;
 using Meerkat.App.Tray;
 using Meerkat.App.Updates;
 using Meerkat.App.Security;
@@ -90,6 +91,7 @@ public partial class App : Application
         services.AddSingleton<OverlayState>();
         services.AddSingleton<IOverlayState>(provider => provider.GetRequiredService<OverlayState>());
         services.AddSingleton<ApplicationRestart>();
+        services.AddSingleton<IAutostart>(_ => new RegistryAutostart(Environment.ProcessPath ?? throw new InvalidOperationException("The path of the running program is unknown.")));
         services.AddSingleton<IReleaseFeed, GitHubReleaseFeed>();
         services.AddSingleton<IUpdateInstaller>(_ => ExecutableSwapInstaller.ForCurrentProcess());
         services.AddSingleton(_ => UpdateEnvironment.ForCurrentProcess());

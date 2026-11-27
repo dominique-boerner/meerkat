@@ -7,6 +7,7 @@ using Meerkat.App.Diagnostics;
 using Meerkat.App.Hotkeys;
 using Meerkat.App.Settings;
 using Meerkat.App.SettingsUi;
+using Meerkat.App.Startup;
 using Meerkat.App.Tray;
 using Meerkat.App.Updates;
 using Microsoft.Win32;
@@ -25,6 +26,7 @@ public sealed class OverlayShell(
     UpdateService updates,
     UpdateViewModel updateViewModel,
     ApplicationRestart applicationRestart,
+    IAutostart autostart,
     ErrorLog errorLog)
 {
     private const int TogglePanelHotkeyId = 1;
@@ -336,6 +338,7 @@ public sealed class OverlayShell(
             AppPaths.SettingsFileDisplayPath)
         {
             SuspendHotkeys = hotkeys.Suspend,
+            Autostart = autostart,
             WidgetHotkeys = [.. _hostedWidgets.SelectMany(hosted => hosted.Hotkeys.Select(hotkey => new WidgetHotkeyViewModel(
                 hotkey.SettingsKey,
                 hotkey.Definition.Title,

@@ -48,7 +48,7 @@ public partial class SettingsWindow : Window
             return;
         }
 
-        FrameworkElement[] shellSections = [HotkeysSection, AppearanceSection, WidgetsSection];
+        FrameworkElement[] shellSections = [HotkeysSection, GeneralSection, WidgetsSection];
         var selectedIndex = Math.Max(0, Navigation.SelectedIndex);
         for (var index = 0; index < shellSections.Length; index++)
         {

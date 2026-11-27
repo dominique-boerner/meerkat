@@ -1,3 +1,4 @@
+using Meerkat.App.Startup;
 using System.IO;
 using Meerkat.App.Settings;
 using Meerkat.App.SettingsUi;
@@ -121,7 +122,7 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.False(reloaded.Current.Updates.CheckAutomatically);
         Assert.True(reloaded.Current.Updates.DownloadInBackground);
         Assert.Equal(UpdateChannel.Prerelease, reloaded.Current.Updates.Channel);
-        Assert.Equal(["Hotkeys", "Appearance", "Widgets", "Updates"], viewModel.NavigationItems.Select(item => item.Title));
+        Assert.Equal(["Hotkeys", "General", "Widgets", "Updates"], viewModel.NavigationItems.Select(item => item.Title));
     }
 
     [Theory]
@@ -139,6 +140,65 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.False(File.Exists(FilePath));
     }
 
+    [Fact]
+    public void SettingsViewModel_SwitchesAutostartOnlyWhenTheUserChangedIt()
+    {
+        var autostart = new FakeAutostart { IsEnabled = true };
+        var unchanged = new SettingsViewModel(new SettingsService(FilePath), [new MonitorOption(null, "Primary monitor")], [], [], _updates.ViewModel, hotkeyWarning: null, FilePath) { Autostart = autostart };
+        Assert.True(unchanged.CanStartWithWindows);
+        Assert.True(unchanged.StartWithWindows);
+
+        // The entry may point to another copy of Meerkat; saving other settings must leave it alone.
+        Assert.True(unchanged.TrySave());
+        Assert.Equal(0, autostart.Changes);
+
+        unchanged.StartWithWindows = false;
+        Assert.True(unchanged.TrySave());
+        Assert.False(autostart.IsEnabled);
+        Assert.Equal(1, autostart.Changes);
+
+        Assert.False(CreateViewModel(new SettingsService(FilePath)).CanStartWithWindows);
+    }
+
+    [Fact]
+    public void RegistryAutostart_AddsAndRemovesTheQuotedProgramPath()
+    {
+        var keyPath = $@"Software\Meerkat.Tests\{Guid.NewGuid():N}";
+        var autostart = new RegistryAutostart(@"C:\Program Files\Meerkat\Meerkat.exe", keyPath, "Meerkat");
+        try
+        {
+            Assert.False(autostart.IsEnabled);
+
+            autostart.SetEnabled(true);
+            Assert.True(autostart.IsEnabled);
+            using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(keyPath))
+            {
+                Assert.Equal("\"C:\\Program Files\\Meerkat\\Meerkat.exe\"", key?.GetValue("Meerkat"));
+            }
+
+            autostart.SetEnabled(false);
+            autostart.SetEnabled(false);
+            Assert.False(autostart.IsEnabled);
+        }
+        finally
+        {
+            Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(@"Software\Meerkat.Tests", throwOnMissingSubKey: false);
+        }
+    }
+
     private SettingsViewModel CreateViewModel(SettingsService service, params WidgetToggleViewModel[] widgets) =>
         new(service, [new MonitorOption(null, "Primary monitor")], widgets, [], _updates.ViewModel, hotkeyWarning: null, FilePath);
+
+    private sealed class FakeAutostart : IAutostart
+    {
+        public bool IsEnabled { get; set; }
+
+        public int Changes { get; private set; }
+
+        public void SetEnabled(bool isEnabled)
+        {
+            IsEnabled = isEnabled;
+            Changes++;
+        }
+    }
 }

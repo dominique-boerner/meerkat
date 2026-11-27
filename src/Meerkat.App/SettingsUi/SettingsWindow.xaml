@@ -225,8 +225,13 @@
                         </DockPanel>
                     </StackPanel>
 
-                    <StackPanel x:Name="AppearanceSection">
-                        <TextBlock Style="{StaticResource Overlay.SectionTitle}" Text="Appearance" />
+                    <StackPanel x:Name="GeneralSection">
+                        <TextBlock Style="{StaticResource Overlay.SectionTitle}" Text="General" />
+                        <StackPanel Margin="0,0,0,10" Visibility="{Binding CanStartWithWindows, Converter={StaticResource BoolToVisibility}}">
+                            <CheckBox IsChecked="{Binding StartWithWindows}" Content="Start Meerkat when I sign in to Windows" />
+                            <TextBlock Style="{StaticResource Overlay.Hint}" Margin="0,4,0,0" TextWrapping="Wrap"
+                                       Text="Adds Meerkat to your startup apps. If you move Meerkat.exe afterwards, switch this off and on again." />
+                        </StackPanel>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="162" />

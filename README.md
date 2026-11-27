@@ -89,7 +89,8 @@ inside WSL, for GitLab and GitHub, for servers reachable over SSH, and for notes
 2. Extract it anywhere and run `Meerkat.exe`.
 
 Meerkat shows its status bar in the top right corner, from where you can move it anywhere, and adds
-an icon to the notification area.
+an icon to the notification area. There is no installer; to have Meerkat start with Windows, switch
+that on in the settings under *General*.
 
 ## Usage
 
@@ -110,8 +111,8 @@ lines; a double-click on the edge restores the default. Both actions are also av
 ### Configuration
 
 Open the settings from the tray icon or the gear button in the panel. You can change the hotkeys,
-the opacity of the status bar, the monitor Meerkat appears on, which widgets are enabled, and the
-settings each widget contributes.
+whether Meerkat starts when you sign in to Windows, the opacity of the status bar, the monitor
+Meerkat appears on, which widgets are enabled, and the settings each widget contributes.
 
 Everything is stored as JSON in `%AppData%\Meerkat\settings.json`. Errors are logged to
 `%AppData%\Meerkat\error.log`.

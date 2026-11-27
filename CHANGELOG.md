@@ -9,6 +9,11 @@ The section of a version becomes the text of its GitHub release and is what Meer
 
 ## [Unreleased]
 
+### Added
+
+- Meerkat can start when you sign in to Windows. Switch it on in the settings under *General*, the
+  page formerly called *Appearance*.
+
 ## [1.5.0] - 2026-11-27
 
 ### Added
