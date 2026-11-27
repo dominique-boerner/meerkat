@@ -9,7 +9,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <!-- Local builds use this version; the release pipeline overrides it with the Git tag. -->
-    <Version>1.2.0</Version>
+    <Version>1.3.0</Version>
     <Product>Meerkat</Product>
     <Description>A click-through desktop overlay for developers, built from widgets.</Description>
     <Copyright>Copyright (c) Meerkat contributors</Copyright>

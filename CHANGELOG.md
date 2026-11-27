@@ -9,6 +9,8 @@ The section of a version becomes the text of its GitHub release and is what Meer
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-27
+
 ### Changed
 
 - New way of working with Meerkat: floating widgets are replaced by a small click-through status bar
