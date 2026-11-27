@@ -1,6 +1,6 @@
 using Meerkat.Widgets.Server.Monitoring;
 using Meerkat.Widgets.Server.Settings;
-using Meerkat.Widgets.Server.Ssh;
+using Meerkat.Ssh;
 
 namespace Meerkat.Tests.Server;
 
@@ -17,8 +17,30 @@ internal sealed class FakeSshClient : ISshClient
     public Task<SshResult> RunAsync(SshTarget target, string command, HostKeyPolicy policy, CancellationToken cancellationToken)
     {
         Targets.Add(target);
+        Commands.Add(command);
         Calls.Add($"run {target.Address} {policy}");
         return Failure is null ? Task.FromResult(Result) : Task.FromException<SshResult>(Failure);
+    }
+
+    /// <summary>Lines handed out by <see cref="StreamAsync"/>.</summary>
+    public List<SshOutputLine> StreamLines { get; } = [];
+
+    public List<string> Commands { get; } = [];
+
+    public async IAsyncEnumerable<SshOutputLine> StreamAsync(
+        SshTarget target,
+        string command,
+        HostKeyPolicy policy,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        Targets.Add(target);
+        Commands.Add(command);
+        Calls.Add($"stream {target.Address} {policy}");
+        foreach (var line in StreamLines)
+        {
+            await Task.Yield();
+            yield return line;
+        }
     }
 
     public Task ForgetHostKeyAsync(SshTarget target, CancellationToken cancellationToken)

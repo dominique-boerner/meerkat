@@ -2,7 +2,7 @@ using System.ComponentModel;
 using Meerkat.Tests.Git;
 using Meerkat.Widgets.Server.Monitoring;
 using Meerkat.Widgets.Server.Settings;
-using Meerkat.Widgets.Server.Ssh;
+using Meerkat.Ssh;
 
 namespace Meerkat.Tests.Server;
 

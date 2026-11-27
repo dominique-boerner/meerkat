@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using Meerkat.Abstractions;
 using Meerkat.Widgets.Server.Settings;
-using Meerkat.Widgets.Server.Ssh;
+using Meerkat.Ssh;
 
 namespace Meerkat.Widgets.Server.Monitoring;
 
@@ -195,49 +195,16 @@ public sealed partial class ServerProbe(ISshClient sshClient, IWidgetSecretStore
 
     public static ProbeException ClassifyFailure(string error)
     {
-        if (error.Contains("REMOTE HOST IDENTIFICATION HAS CHANGED", StringComparison.Ordinal))
+        var failure = SshFailure.Classify(error);
+        var kind = failure.Kind switch
         {
-            var fingerprint = Fingerprint().Match(error);
-            return new ProbeException(ProbeFailureKind.HostKeyChanged, "The host key has changed.", fingerprint.Success ? fingerprint.Value : null);
-        }
-
-        if (error.Contains("Host key verification failed", StringComparison.Ordinal)
-            || error.Contains("host key is known", StringComparison.Ordinal))
-        {
-            return new ProbeException(ProbeFailureKind.HostKeyUnknown, "The host key is not trusted yet.");
-        }
-
-        if (error.Contains("Permission denied", StringComparison.Ordinal))
-        {
-            return new ProbeException(ProbeFailureKind.AuthenticationFailed, "Authentication failed");
-        }
-
-        return new ProbeException(ProbeFailureKind.Unreachable, DescribeConnectionError(error));
+            SshFailureKind.HostKeyChanged => ProbeFailureKind.HostKeyChanged,
+            SshFailureKind.HostKeyUnknown => ProbeFailureKind.HostKeyUnknown,
+            SshFailureKind.AuthenticationFailed => ProbeFailureKind.AuthenticationFailed,
+            _ => ProbeFailureKind.Unreachable,
+        };
+        return new ProbeException(kind, failure.Message, failure.Fingerprint);
     }
-
-    private static string DescribeConnectionError(string error)
-    {
-        if (error.Contains("timed out", StringComparison.OrdinalIgnoreCase))
-        {
-            return "SSH timeout";
-        }
-
-        if (error.Contains("Could not resolve hostname", StringComparison.Ordinal))
-        {
-            return "Host name not found";
-        }
-
-        if (error.Contains("Connection refused", StringComparison.Ordinal))
-        {
-            return "Connection refused";
-        }
-
-        // Fall back to what ssh said, without its "ssh: " prefix and without warnings that precede the error.
-        var line = error.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .LastOrDefault(candidate => !candidate.StartsWith("Warning:", StringComparison.Ordinal));
-        return line is null ? "SSH connection failed" : line.Replace("ssh: ", string.Empty, StringComparison.Ordinal);
-    }
-
     private static Dictionary<string, List<string>> ReadSections(string output)
     {
         var sections = new Dictionary<string, List<string>>();
@@ -266,6 +233,4 @@ public sealed partial class ServerProbe(ISshClient sshClient, IWidgetSecretStore
     [GeneratedRegex(@"^[A-Za-z0-9][A-Za-z0-9@._:\-]*$")]
     private static partial Regex ServiceName();
 
-    [GeneratedRegex(@"SHA256:[A-Za-z0-9+/=]+")]
-    private static partial Regex Fingerprint();
 }

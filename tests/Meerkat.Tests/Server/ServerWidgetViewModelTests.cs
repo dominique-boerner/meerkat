@@ -3,7 +3,7 @@ using Meerkat.Tests.Docker;
 using Meerkat.Widgets.Server;
 using Meerkat.Widgets.Server.Monitoring;
 using Meerkat.Widgets.Server.Settings;
-using Meerkat.Widgets.Server.Ssh;
+using Meerkat.Ssh;
 using Meerkat.Widgets.Server.ViewModels;
 
 namespace Meerkat.Tests.Server;

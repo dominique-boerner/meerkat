@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace Meerkat.Widgets.Server.Ssh;
+namespace Meerkat.Ssh;
 
 public static class SshConfigFile
 {

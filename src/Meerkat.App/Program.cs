@@ -1,4 +1,4 @@
-using Meerkat.Widgets.Server.Ssh;
+using Meerkat.Ssh;
 
 namespace Meerkat.App;
 

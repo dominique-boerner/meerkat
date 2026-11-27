@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 using Meerkat.Abstractions;
-using Meerkat.Widgets.Server.Ssh;
+using Meerkat.Ssh;
 
 namespace Meerkat.Widgets.Server.Settings;
 

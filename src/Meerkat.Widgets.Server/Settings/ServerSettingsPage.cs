@@ -5,7 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Meerkat.Abstractions;
 using Meerkat.Widgets.Server.Monitoring;
-using Meerkat.Widgets.Server.Ssh;
+using Meerkat.Ssh;
 using Meerkat.Widgets.Server.Views;
 
 namespace Meerkat.Widgets.Server.Settings;

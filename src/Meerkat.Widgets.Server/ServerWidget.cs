@@ -2,10 +2,11 @@ using System.Windows;
 using Meerkat.Abstractions;
 using Meerkat.Widgets.Server.Monitoring;
 using Meerkat.Widgets.Server.Settings;
-using Meerkat.Widgets.Server.Ssh;
+using Meerkat.Ssh;
 using Meerkat.Widgets.Server.ViewModels;
 using Meerkat.Widgets.Server.Views;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Meerkat.Widgets.Server;
 
@@ -52,7 +53,7 @@ public static class ServerWidgetServiceCollectionExtensions
 {
     public static IServiceCollection AddServerWidget(this IServiceCollection services)
     {
-        services.AddSingleton<ISshClient, OpenSshClient>();
+        services.TryAddSingleton<ISshClient, OpenSshClient>();
         services.AddSingleton<IServerProbe, ServerProbe>();
         services.AddSingleton<ServerSettingsSource>();
         services.AddSingleton(provider => new ServerWidgetViewModel(

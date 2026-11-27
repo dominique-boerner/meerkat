@@ -1,7 +1,7 @@
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
-namespace Meerkat.Widgets.Server.Ssh;
+namespace Meerkat.Ssh;
 
 [JsonConverter(typeof(JsonStringEnumConverter<SshAuthentication>))]
 public enum SshAuthentication
@@ -76,9 +76,17 @@ public sealed partial record SshTarget(
 
 public sealed record SshResult(int ExitCode, string Output, string Error, TimeSpan Duration);
 
+public readonly record struct SshOutputLine(string Text, bool IsError);
+
 public interface ISshClient
 {
     Task<SshResult> RunAsync(SshTarget target, string command, HostKeyPolicy policy, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Runs a command that keeps printing, such as following a log, and yields its output line by line
+    /// until the command ends or the token is cancelled, which closes the connection.
+    /// </summary>
+    IAsyncEnumerable<SshOutputLine> StreamAsync(SshTarget target, string command, HostKeyPolicy policy, CancellationToken cancellationToken);
 
     /// <summary>Removes the host's key from known_hosts, so that a new key can be accepted.</summary>
     Task ForgetHostKeyAsync(SshTarget target, CancellationToken cancellationToken);

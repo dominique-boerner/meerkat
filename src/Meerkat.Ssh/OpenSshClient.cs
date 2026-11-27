@@ -1,8 +1,10 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading.Channels;
 
-namespace Meerkat.Widgets.Server.Ssh;
+namespace Meerkat.Ssh;
 
 /// <summary>
 /// Uses the OpenSSH client that ships with Windows. That way the user's ~/.ssh/config, the SSH agent and
@@ -22,6 +24,7 @@ public sealed class OpenSshClient(string? passwordHelperPath = null) : ISshClien
     private const string TerminalExecutable = "wt.exe";
     private const int DefaultPort = 22;
     private const int ConnectTimeoutSeconds = 8;
+    private const int StreamBufferedLines = 1000;
 
     // Upper bound for a whole call, in case the connection stalls after it was established.
     private static readonly TimeSpan CallTimeout = TimeSpan.FromSeconds(30);
@@ -126,6 +129,43 @@ public sealed class OpenSshClient(string? passwordHelperPath = null) : ISshClien
             BuildEnvironment(target, passwordHelperPath ?? Environment.ProcessPath),
             cancellationToken);
 
+    public async IAsyncEnumerable<SshOutputLine> StreamAsync(
+        SshTarget target,
+        string command,
+        HostKeyPolicy policy,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        using var process = Start(
+            SshExecutable,
+            BuildArguments(target, policy, command),
+            BuildEnvironment(target, passwordHelperPath ?? Environment.ProcessPath),
+            createWindow: false);
+
+        // Bounded so a very chatty command is slowed down instead of growing memory without limit.
+        var channel = Channel.CreateBounded<SshOutputLine>(StreamBufferedLines);
+        var pumps = Task.WhenAll(
+            PumpAsync(process.StandardOutput, isError: false, channel.Writer, cancellationToken),
+            PumpAsync(process.StandardError, isError: true, channel.Writer, cancellationToken));
+        _ = pumps.ContinueWith(
+            task => channel.Writer.TryComplete(task.Exception?.GetBaseException()),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
+        try
+        {
+            await foreach (var line in channel.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+            {
+                yield return line;
+            }
+        }
+        finally
+        {
+            // Ending the local process closes the connection, which ends the command on the host.
+            KillIfRunning(process);
+        }
+    }
+
     public async Task ForgetHostKeyAsync(SshTarget target, CancellationToken cancellationToken)
     {
         target.Validate();
@@ -175,6 +215,14 @@ public sealed class OpenSshClient(string? passwordHelperPath = null) : ISshClien
         finally
         {
             KillIfRunning(process);
+        }
+    }
+
+    private static async Task PumpAsync(StreamReader reader, bool isError, ChannelWriter<SshOutputLine> writer, CancellationToken cancellationToken)
+    {
+        while (await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
+        {
+            await writer.WriteAsync(new SshOutputLine(line, isError), cancellationToken).ConfigureAwait(false);
         }
     }
 
