@@ -33,7 +33,7 @@ public sealed class GitHubProvider(HttpClient client, Uri serverUrl) : IGitProvi
 
     public async Task<IReadOnlyList<GitProject>> ListProjectsAsync(CancellationToken cancellationToken)
     {
-        using var repositories = await _api.GetAsync("user/repos?sort=pushed&per_page=50", cancellationToken).ConfigureAwait(false);
+        using var repositories = await _api.GetAsync("user/repos?sort=pushed&per_page=100", cancellationToken).ConfigureAwait(false);
         return [.. repositories.RootElement.Items()
             .Select(repository => repository.GetText("full_name"))
             .Select(fullName => new GitProject(fullName, fullName))];

@@ -44,6 +44,8 @@ public sealed class GitSettingsSource(IWidgetSettingsStore store, IWidgetSecretS
 
     public string? ReadToken(GitWidgetSettings settings) => secrets.Read(settings.SecretKey);
 
+    public void RemoveToken(GitWidgetSettings settings) => secrets.Delete(settings.SecretKey);
+
     /// <param name="newToken">Replaces the stored token; null or empty keeps it.</param>
     public void Update(GitWidgetSettings settings, string? newToken)
     {

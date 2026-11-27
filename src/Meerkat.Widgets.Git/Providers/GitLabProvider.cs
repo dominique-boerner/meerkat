@@ -31,7 +31,7 @@ public sealed class GitLabProvider(HttpClient client, Uri serverUrl) : IGitProvi
     public async Task<IReadOnlyList<GitProject>> ListProjectsAsync(CancellationToken cancellationToken)
     {
         using var projects = await _api
-            .GetAsync("projects?membership=true&simple=true&archived=false&order_by=last_activity_at&per_page=50", cancellationToken)
+            .GetAsync("projects?membership=true&simple=true&archived=false&order_by=last_activity_at&per_page=100", cancellationToken)
             .ConfigureAwait(false);
         return [.. projects.RootElement.Items()
             .Select(project => new GitProject(project.GetText("id"), project.GetText("path_with_namespace")))];

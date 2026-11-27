@@ -184,7 +184,8 @@ public class GitWidgetViewModelTests
         page.Projects[1].IsSelected = true;
         source.Update(page.ToSettings(), page.Token);
 
-        Assert.False(page.IsConnectionError);
+        Assert.Equal(GitConnectionState.Connected, page.ConnectionState);
+        Assert.Equal("Projects · 1 of 2 selected", page.ProjectsSummary);
         Assert.StartsWith("Connected as dev", page.ConnectionStatus);
         Assert.Equal(["shop/shop-core", "shop/shop-portal"], page.Projects.Select(option => option.Project.Name));
         Assert.Equal([new GitProject("2", "shop/shop-portal")], source.Current.Projects);
@@ -204,8 +205,64 @@ public class GitWidgetViewModelTests
         Assert.Equal(GitWidgetSettings.DefaultGitHubUrl, page.ServerUrl);
         Assert.Empty(page.Projects);
         Assert.Equal("Repositories", page.ProjectsLabel);
-        Assert.True(page.IsConnectionError);
+        Assert.Equal(GitConnectionState.Failed, page.ConnectionState);
         Assert.Equal("Enter an access token first.", page.ConnectionStatus);
+    }
+
+    [Fact]
+    public async Task SettingsPage_WithStoredTokenConnectsRightAwayAndOffersAllProjects()
+    {
+        var settings = new GitWidgetSettings { Projects = [Core] };
+        _settingsStore.Save(GitWidget.WidgetId, settings);
+        _secrets.Write(settings.SecretKey, "stored-token");
+        GitLab.Projects.AddRange([Core, new GitProject("2", "shop/shop-portal"), new GitProject("3", "docs/handbook")]);
+
+        var page = new GitSettingsPageViewModel(new GitSettingsSource(_settingsStore, _secrets), _factory);
+        await page.Initialization;
+
+        Assert.Equal(GitConnectionState.Connected, page.ConnectionState);
+        Assert.Equal("Connected as dev", page.ConnectionStatus);
+        Assert.True(page.HasStoredToken);
+        Assert.True(page.ShowStoredTokenPlaceholder);
+        Assert.Equal(["shop/shop-core", "shop/shop-portal", "docs/handbook"], page.Projects.Select(option => option.Project.Name));
+        Assert.Equal([true, false, false], page.Projects.Select(option => option.IsSelected));
+        Assert.Equal("Projects · 1 of 3 selected", page.ProjectsSummary);
+
+        // The stored token itself never appears in the page.
+        Assert.Equal(string.Empty, page.Token);
+        Assert.Equal("stored-token", _factory.Tokens[^1]);
+
+        page.ProjectFilter = "SHOP";
+        Assert.Equal([true, true, false], page.Projects.Select(option => option.IsVisible));
+
+        page.Projects[1].IsSelected = true;
+        Assert.Equal("Projects · 2 of 3 selected", page.ProjectsSummary);
+
+        page.Token = "replacement";
+        Assert.False(page.ShowStoredTokenPlaceholder);
+    }
+
+    [Fact]
+    public async Task SettingsPage_RemovesTheStoredTokenOnSave()
+    {
+        var settings = new GitWidgetSettings();
+        _settingsStore.Save(GitWidget.WidgetId, settings);
+        _secrets.Write(settings.SecretKey, "stored-token");
+        var source = new GitSettingsSource(_settingsStore, _secrets);
+        var viewModel = new GitSettingsPageViewModel(source, _factory);
+        await viewModel.Initialization;
+
+        viewModel.RemoveTokenCommand.Execute(null);
+
+        Assert.True(viewModel.IsTokenRemovalRequested);
+        Assert.False(viewModel.HasStoredToken);
+        Assert.Equal(GitConnectionState.NotConnected, viewModel.ConnectionState);
+
+        // Nothing is deleted until the user saves; cancelling the settings keeps the token.
+        Assert.Equal("stored-token", source.ReadToken(settings));
+
+        source.RemoveToken(viewModel.ToSettings());
+        Assert.Null(source.ReadToken(settings));
     }
 
     [Theory]

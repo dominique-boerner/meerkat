@@ -18,6 +18,9 @@ The section of a version becomes the text of its GitHub release and is what Meer
 - Widgets now report a status and alerts to the shell. The Docker widget warns about containers in a
   restart loop; the Git widget reports failed pipelines and waiting reviews.
 - The log viewer of the Docker widget is part of its page in the panel again.
+- The Git settings show the connection at a glance: a stored token is indicated by dots, the page
+  connects on its own and lists all projects or repositories with a search field, and the token can
+  be removed.
 
 ### Removed
 

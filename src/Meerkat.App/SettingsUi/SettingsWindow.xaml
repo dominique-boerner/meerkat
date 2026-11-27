@@ -4,7 +4,7 @@
         Title="Meerkat – Settings"
         Icon="/Assets/meerkat-app.ico"
         Width="800"
-        Height="440"
+        Height="490"
         WindowStyle="None"
         ResizeMode="NoResize"
         Topmost="True"
