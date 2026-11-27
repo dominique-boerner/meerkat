@@ -16,6 +16,9 @@ public partial class StatusBarWindow : Window
     // Gap between the bar and the cards, which each card brings along as its top margin.
     private const double CardGap = 6;
 
+    // Wide enough for a title and a line of detail; cards with more text shorten it.
+    private const double CardWidth = 390;
+
     private double _positionX = StatusBarPlacement.DefaultX;
     private double _positionY = StatusBarPlacement.DefaultY;
 
@@ -72,7 +75,13 @@ public partial class StatusBarWindow : Window
         NativeMethods.SetWindowLongPtr(handle, NativeMethods.GwlExStyle, new IntPtr(style));
     }
 
-    private void OnBarSizeChanged(object sender, SizeChangedEventArgs e) => ApplyPlacement();
+    private void OnBarSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        // The bar takes the room its chips need, however many widgets report. The cards keep a fixed
+        // width so that long texts are shortened, and only widen to stay flush with a longer bar.
+        CardsPanel.Width = Math.Max(CardWidth, Bar.ActualWidth);
+        ApplyPlacement();
+    }
 
     private void ApplyPlacement()
     {

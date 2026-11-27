@@ -172,7 +172,7 @@
         screen edges nearest to the position the user chose; the bar comes first so that the cards can be
         docked below or above it.
     -->
-    <DockPanel x:Name="Group" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,16,0" Width="390" LastChildFill="False">
+    <DockPanel x:Name="Group" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,16,0" LastChildFill="False">
         <Button x:Name="Bar"
                 DockPanel.Dock="Top"
                 Style="{StaticResource BarButton}"
@@ -236,7 +236,8 @@
         </Border>
         </Button>
 
-        <StackPanel x:Name="CardsPanel" DockPanel.Dock="Top">
+        <!-- The width is set by the code-behind: that of a card, or of the bar where the bar is wider. -->
+        <StackPanel x:Name="CardsPanel" DockPanel.Dock="Top" Width="390">
         <ItemsControl ItemsSource="{Binding Alerts}" ItemTemplate="{StaticResource AlertCard}" Focusable="False" />
 
         <Button>

@@ -26,6 +26,11 @@ The section of a version becomes the text of its GitHub release and is what Meer
   `Shift+Tab` and the arrow keys move between blocks, and after `Esc` the block stays selected so
   that `Enter` opens it again.
 
+### Fixed
+
+- The status bar is no longer cut off when many widgets report: it takes the room its chips need,
+  and the cards widen with it.
+
 ## [1.5.0] - 2026-11-27
 
 ### Added
