@@ -7,6 +7,7 @@ using Meerkat.App.Hotkeys;
 using Meerkat.App.Settings;
 using Meerkat.App.SettingsUi;
 using Meerkat.App.Tray;
+using Meerkat.App.Updates;
 using Microsoft.Win32;
 
 namespace Meerkat.App.Overlay;
@@ -20,6 +21,9 @@ public sealed class OverlayShell(
     IEnumerable<IOverlayWidget> widgets,
     HotkeyService hotkeys,
     TrayIconService tray,
+    UpdateService updates,
+    UpdateViewModel updateViewModel,
+    ApplicationRestart applicationRestart,
     ErrorLog errorLog)
 {
     private const int ToggleModeHotkeyId = 1;
@@ -30,6 +34,7 @@ public sealed class OverlayShell(
     private static readonly TimeSpan WidgetStopTimeout = TimeSpan.FromSeconds(3);
 
     private readonly List<HostedWidget> _hostedWidgets = [];
+    private readonly CancellationTokenSource _lifetime = new();
 
     private OverlayWindow? _window;
     private SettingsWindow? _settingsWindow;
@@ -45,8 +50,10 @@ public sealed class OverlayShell(
         tray.ToggleVisibilityRequested += (_, _) => ToggleVisibility();
         tray.ToggleModeRequested += (_, _) => ToggleMode();
         tray.SettingsRequested += (_, _) => OpenSettings();
-        tray.ExitRequested += async (_, _) => await ExitAsync();
+        tray.ExitRequested += async (_, _) => await ExitAsync(restart: false);
         commands.SettingsRequested += (_, _) => OpenSettings();
+        updates.RestartRequested += async (_, _) => await ExitAsync(restart: true);
+        updateViewModel.PropertyChanged += (_, _) => state.SetNotice(updateViewModel.Notice);
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
 
         foreach (var widget in widgets)
@@ -62,6 +69,7 @@ public sealed class OverlayShell(
         _window.MoveToBounds(MonitorLocator.ResolveWorkingArea(settings.Current.Monitor));
         state.SetVisible(true);
 
+        _ = updates.RunAsync(_lifetime.Token);
         await SyncWidgetsAsync();
     }
 
@@ -202,12 +210,20 @@ public sealed class OverlayShell(
                 hosted.Widget.GetType().Namespace ?? string.Empty,
                 !settings.Current.DisabledWidgets.Contains(hosted.Host.Id)))],
             CreateSettingsSections(),
+            updateViewModel,
             _hotkeyWarning,
             AppPaths.SettingsFileDisplayPath);
         settingsViewModel.Saved += async (_, _) =>
         {
             ApplySettings();
             await SyncWidgetsAsync();
+
+            // The channel or the automatic check may have changed.
+            updateViewModel.Refresh();
+            if (settings.Current.Updates.CheckAutomatically)
+            {
+                await updates.CheckAsync(userInitiated: false);
+            }
         };
 
         _settingsWindow = new SettingsWindow { DataContext = settingsViewModel };
@@ -297,7 +313,7 @@ public sealed class OverlayShell(
         _window?.Dispatcher.BeginInvoke(
             () => _window.MoveToBounds(MonitorLocator.ResolveWorkingArea(settings.Current.Monitor)));
 
-    private async Task ExitAsync()
+    private async Task ExitAsync(bool restart)
     {
         if (_isExiting)
         {
@@ -305,6 +321,16 @@ public sealed class OverlayShell(
         }
 
         _isExiting = true;
+        await _lifetime.CancelAsync();
+        if (restart)
+        {
+            applicationRestart.Request();
+        }
+        else
+        {
+            updates.InstallPendingOnExit();
+        }
+
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         SaveLayout();
 

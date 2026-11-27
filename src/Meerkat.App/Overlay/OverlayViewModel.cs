@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Meerkat.App.Updates;
 
 namespace Meerkat.App.Overlay;
 
@@ -13,6 +14,9 @@ public sealed partial class OverlayViewModel : ObservableObject
 
     [ObservableProperty]
     private string _modeHotkeyText = string.Empty;
+
+    /// <summary>Backs the update card; null where no update support is wired up.</summary>
+    public UpdateViewModel? Update { get; init; }
 
     /// <summary>Widgets and panels currently shown on the overlay.</summary>
     public ObservableCollection<WidgetHostViewModel> Hosts { get; } = [];

@@ -1,6 +1,8 @@
 using System.Windows;
 using Meerkat.Abstractions;
+using Meerkat.App.Interop;
 using Meerkat.App.Overlay;
+using Meerkat.App.Updates;
 using Microsoft.Win32;
 using Drawing = System.Drawing;
 using WinForms = System.Windows.Forms;
@@ -17,6 +19,9 @@ public sealed class TrayIconService : IDisposable
     private static readonly Drawing.Color Hover = Drawing.Color.FromArgb(0x2B, 0x30, 0x3A);
     private static readonly Drawing.Color Text = Drawing.Color.FromArgb(0xE6, 0xE8, 0xEC);
     private static readonly Drawing.Color TextMuted = Drawing.Color.FromArgb(0x8B, 0x93, 0xA1);
+    private static readonly Drawing.Color Accent = Drawing.Color.FromArgb(0x5B, 0xB6, 0xFF);
+
+    private const float BadgeSizeRatio = 0.42f;
 
     private readonly OverlayState _state;
     private readonly WinForms.NotifyIcon _notifyIcon;
@@ -24,13 +29,26 @@ public sealed class TrayIconService : IDisposable
     private readonly WinForms.ToolStripMenuItem _visibilityItem;
     private readonly WinForms.ToolStripMenuItem _modeItem;
 
+    private readonly UpdateViewModel _update;
+    private readonly WinForms.ToolStripMenuItem _updateItem;
+    private readonly WinForms.ToolStripSeparator _updateSeparator = new();
+
     // Named after the icon's own color: the light icon is for a dark taskbar and vice versa.
     private readonly Drawing.Icon _lightIcon = LoadIcon("meerkat-tray-light.ico");
     private readonly Drawing.Icon _darkIcon = LoadIcon("meerkat-tray-dark.ico");
+    private readonly Drawing.Icon _lightBadgedIcon;
+    private readonly Drawing.Icon _darkBadgedIcon;
 
-    public TrayIconService(OverlayState state)
+    public TrayIconService(OverlayState state, UpdateViewModel update)
     {
         _state = state;
+        _update = update;
+        _lightBadgedIcon = AddBadge(_lightIcon);
+        _darkBadgedIcon = AddBadge(_darkIcon);
+
+        _updateItem = CreateItem(_update.RunTrayAction);
+        _updateItem.ForeColor = Accent;
+        _updateItem.Font = new Drawing.Font(_updateItem.Font, Drawing.FontStyle.Bold);
 
         _visibilityItem = CreateItem(() => ToggleVisibilityRequested?.Invoke(this, EventArgs.Empty));
         _modeItem = CreateItem(() => ToggleModeRequested?.Invoke(this, EventArgs.Empty));
@@ -51,7 +69,7 @@ public sealed class TrayIconService : IDisposable
             ForeColor = TextMuted,
             Font = new Drawing.Font(_menu.Font.FontFamily, 7.5f, Drawing.FontStyle.Bold),
         });
-        _menu.Items.AddRange([_visibilityItem, _modeItem, new WinForms.ToolStripSeparator(), settingsItem, new WinForms.ToolStripSeparator(), exitItem]);
+        _menu.Items.AddRange([_updateItem, _updateSeparator, _visibilityItem, _modeItem, new WinForms.ToolStripSeparator(), settingsItem, new WinForms.ToolStripSeparator(), exitItem]);
 
         _notifyIcon = new WinForms.NotifyIcon
         {
@@ -64,7 +82,9 @@ public sealed class TrayIconService : IDisposable
 
         SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
         _state.Changed += OnStateChanged;
+        _update.PropertyChanged += OnUpdateChanged;
         OnStateChanged(this, EventArgs.Empty);
+        OnUpdateChanged(this, EventArgs.Empty);
     }
 
     public event EventHandler? ToggleVisibilityRequested;
@@ -82,6 +102,7 @@ public sealed class TrayIconService : IDisposable
     {
         SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
         _state.Changed -= OnStateChanged;
+        _update.PropertyChanged -= OnUpdateChanged;
 
         // Hiding first removes the icon immediately instead of leaving a ghost until the tray is hovered.
         _notifyIcon.Visible = false;
@@ -89,6 +110,28 @@ public sealed class TrayIconService : IDisposable
         _menu.Dispose();
         _lightIcon.Dispose();
         _darkIcon.Dispose();
+
+        // Icons created from a bitmap handle do not own it, so it has to be released explicitly.
+        foreach (var badgedIcon in new[] { _lightBadgedIcon, _darkBadgedIcon })
+        {
+            NativeMethods.DestroyIcon(badgedIcon.Handle);
+            badgedIcon.Dispose();
+        }
+    }
+
+    /// <summary>Draws the accent dot that marks a pending update onto a copy of the icon.</summary>
+    private static Drawing.Icon AddBadge(Drawing.Icon icon)
+    {
+        using var bitmap = icon.ToBitmap();
+        using (var graphics = Drawing.Graphics.FromImage(bitmap))
+        using (var brush = new Drawing.SolidBrush(Accent))
+        {
+            graphics.SmoothingMode = Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            var diameter = bitmap.Width * BadgeSizeRatio;
+            graphics.FillEllipse(brush, bitmap.Width - diameter, 0, diameter, diameter);
+        }
+
+        return Drawing.Icon.FromHandle(bitmap.GetHicon());
     }
 
     private static WinForms.ToolStripMenuItem CreateItem(Action onClick)
@@ -112,7 +155,23 @@ public sealed class TrayIconService : IDisposable
         return key?.GetValue(SystemUsesLightThemeValue) is 1;
     }
 
-    private Drawing.Icon SelectIcon() => IsTaskbarLight() ? _darkIcon : _lightIcon;
+    private Drawing.Icon SelectIcon() => (IsTaskbarLight(), _update.HasUpdate) switch
+    {
+        (true, true) => _darkBadgedIcon,
+        (true, false) => _darkIcon,
+        (false, true) => _lightBadgedIcon,
+        (false, false) => _lightIcon,
+    };
+
+    private void OnUpdateChanged(object? sender, EventArgs e)
+    {
+        var actionText = _update.TrayActionText;
+        _updateItem.Text = actionText ?? string.Empty;
+        _updateItem.Visible = actionText is not null;
+        _updateItem.Enabled = _update.IsReady || _update.IsAvailable;
+        _updateSeparator.Visible = actionText is not null;
+        _notifyIcon.Icon = SelectIcon();
+    }
 
     private void OnUserPreferenceChanged(object? sender, UserPreferenceChangedEventArgs e)
     {

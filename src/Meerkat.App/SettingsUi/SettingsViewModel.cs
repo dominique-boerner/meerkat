@@ -5,12 +5,18 @@ using CommunityToolkit.Mvvm.Input;
 using Meerkat.Abstractions;
 using Meerkat.App.Hotkeys;
 using Meerkat.App.Settings;
+using Meerkat.App.Updates;
 
 namespace Meerkat.App.SettingsUi;
 
 public sealed record MonitorOption(string? DeviceName, string DisplayName);
 
+public sealed record ChannelOption(UpdateChannel Channel, string DisplayName);
+
 public sealed record WidgetSettingsSection(string Title, IWidgetSettingsPage Page, FrameworkElement View);
+
+/// <summary>An entry of the settings navigation; <see cref="Badge"/> marks the entry while an update is pending.</summary>
+public sealed record NavigationItem(string Title, UpdateViewModel? Badge = null);
 
 public sealed partial class WidgetToggleViewModel(string id, string title, string typeName, bool isEnabled) : ObservableObject
 {
@@ -53,6 +59,15 @@ public sealed partial class SettingsViewModel : ObservableObject
     private MonitorOption _selectedMonitor;
 
     [ObservableProperty]
+    private bool _checkForUpdatesAutomatically;
+
+    [ObservableProperty]
+    private bool _downloadUpdatesInBackground;
+
+    [ObservableProperty]
+    private ChannelOption _selectedChannel;
+
+    [ObservableProperty]
     private string? _hotkeyWarning;
 
     [ObservableProperty]
@@ -63,6 +78,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         IReadOnlyList<MonitorOption> monitors,
         IReadOnlyList<WidgetToggleViewModel> widgets,
         IReadOnlyList<WidgetSettingsSection> widgetSections,
+        UpdateViewModel update,
         string? hotkeyWarning,
         string settingsFilePath)
     {
@@ -70,26 +86,44 @@ public sealed partial class SettingsViewModel : ObservableObject
         Monitors = monitors;
         Widgets = widgets;
         WidgetSections = widgetSections;
+        Update = update;
         SettingsFilePath = settingsFilePath;
-        NavigationItems = [.. ShellSectionTitles, .. widgetSections.Select(section => section.Title)];
+        NavigationItems =
+        [
+            .. ShellSectionTitles.Select(title => new NavigationItem(title)),
+            .. widgetSections.Select(section => new NavigationItem(section.Title)),
+            new NavigationItem("Updates", update),
+        ];
 
         var current = settings.Current;
         _toggleModeHotkey = HotkeyGesture.ToDisplayText(current.ToggleModeHotkey);
         _toggleVisibilityHotkey = HotkeyGesture.ToDisplayText(current.ToggleVisibilityHotkey);
         _opacity = current.Opacity;
         _selectedMonitor = monitors.FirstOrDefault(option => option.DeviceName == current.Monitor) ?? monitors[0];
+        _checkForUpdatesAutomatically = current.Updates.CheckAutomatically;
+        _downloadUpdatesInBackground = current.Updates.DownloadInBackground;
+        _selectedChannel = Channels.First(option => option.Channel == current.Updates.Channel);
         _hotkeyWarning = hotkeyWarning;
     }
 
     public event EventHandler? Saved;
 
-    public IReadOnlyList<string> NavigationItems { get; }
+    /// <summary>Shell sections first, then one entry per widget settings page, then the update page.</summary>
+    public IReadOnlyList<NavigationItem> NavigationItems { get; }
 
     public IReadOnlyList<MonitorOption> Monitors { get; }
+
+    public IReadOnlyList<ChannelOption> Channels { get; } =
+    [
+        new(UpdateChannel.Stable, "Stable"),
+        new(UpdateChannel.Prerelease, "Pre-release"),
+    ];
 
     public IReadOnlyList<WidgetToggleViewModel> Widgets { get; }
 
     public IReadOnlyList<WidgetSettingsSection> WidgetSections { get; }
+
+    public UpdateViewModel Update { get; }
 
     public string SettingsFilePath { get; }
 
@@ -123,6 +157,9 @@ public sealed partial class SettingsViewModel : ObservableObject
             current.Opacity = Opacity;
             current.Monitor = SelectedMonitor.DeviceName;
             current.DisabledWidgets = [.. Widgets.Where(widget => !widget.IsEnabled).Select(widget => widget.Id)];
+            current.Updates.CheckAutomatically = CheckForUpdatesAutomatically;
+            current.Updates.DownloadInBackground = DownloadUpdatesInBackground;
+            current.Updates.Channel = SelectedChannel.Channel;
             foreach (var widget in Widgets.Where(widget => widget.IsResetPending))
             {
                 LayoutService.Reset(current, widget.Id);

@@ -14,6 +14,10 @@
     <Resource Include="Assets\*.ico" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Tells the updater at run time which of the two release archives this build came from. -->
+    <AssemblyMetadata Include="SelfContained" Value="$(SelfContained)" />
+  </ItemGroup>
+  <ItemGroup>
     <Using Remove="System.Windows.Forms" />
     <Using Remove="System.Drawing" />
   </ItemGroup>

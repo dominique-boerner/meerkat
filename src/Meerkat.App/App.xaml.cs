@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Windows;
 using Meerkat.Abstractions;
 using Meerkat.App.Diagnostics;
@@ -5,6 +6,7 @@ using Meerkat.App.Hotkeys;
 using Meerkat.App.Overlay;
 using Meerkat.App.Settings;
 using Meerkat.App.Tray;
+using Meerkat.App.Updates;
 using Meerkat.Widgets.Docker;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -61,8 +63,16 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        var restartRequested = _services?.GetService<ApplicationRestart>()?.IsRequested == true;
         _services?.Dispose();
         _singleInstanceMutex?.Dispose();
+
+        // Only after the lock is gone can the next instance start without mistaking itself for a duplicate.
+        if (restartRequested && Environment.ProcessPath is { } executable)
+        {
+            Process.Start(new ProcessStartInfo(executable) { UseShellExecute = false });
+        }
+
         base.OnExit(e);
     }
 
@@ -76,7 +86,13 @@ public partial class App : Application
         services.AddSingleton<LayoutService>();
         services.AddSingleton<OverlayState>();
         services.AddSingleton<IOverlayState>(provider => provider.GetRequiredService<OverlayState>());
-        services.AddSingleton<OverlayViewModel>();
+        services.AddSingleton<ApplicationRestart>();
+        services.AddSingleton<IReleaseFeed, GitHubReleaseFeed>();
+        services.AddSingleton<IUpdateInstaller>(_ => ExecutableSwapInstaller.ForCurrentProcess());
+        services.AddSingleton(_ => UpdateEnvironment.ForCurrentProcess());
+        services.AddSingleton<UpdateService>();
+        services.AddSingleton<UpdateViewModel>();
+        services.AddSingleton(provider => new OverlayViewModel { Update = provider.GetRequiredService<UpdateViewModel>() });
         services.AddSingleton<OverlayCommands>();
         services.AddSingleton<IOverlayCommands>(provider => provider.GetRequiredService<OverlayCommands>());
         services.AddSingleton<IOverlayPanelHost, OverlayPanelHost>();

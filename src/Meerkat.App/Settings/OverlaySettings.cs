@@ -18,6 +18,8 @@ public sealed class OverlaySettings
 
     public List<string> DisabledWidgets { get; set; } = [];
 
+    public UpdateSettings Updates { get; set; } = new();
+
     public Dictionary<string, JsonElement> WidgetSettings { get; set; } = [];
 }
 

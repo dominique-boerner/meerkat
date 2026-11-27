@@ -3,8 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Meerkat – Settings"
         Icon="/Assets/meerkat-app.ico"
-        Width="660"
-        Height="420"
+        Width="800"
+        Height="440"
         WindowStyle="None"
         ResizeMode="NoResize"
         Topmost="True"
@@ -20,6 +20,27 @@
     </WindowChrome.WindowChrome>
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <DataTemplate x:Key="NavigationItemTemplate">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding Title}" />
+                <Ellipse Width="6"
+                         Height="6"
+                         Margin="8,1,0,0"
+                         Fill="{StaticResource Overlay.Accent}"
+                         Visibility="{Binding Badge.HasUpdate, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+            </StackPanel>
+        </DataTemplate>
+        <Style x:Key="LinkButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="{StaticResource Overlay.Accent}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <TextBlock Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}" TextDecorations="Underline" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="NavigationItem" TargetType="ListBoxItem">
             <Setter Property="Foreground" Value="{StaticResource Overlay.Text}" />
             <Setter Property="Cursor" Value="Hand" />
@@ -80,6 +101,7 @@
                      Grid.Column="0"
                      ItemsSource="{Binding NavigationItems}"
                      ItemContainerStyle="{StaticResource NavigationItem}"
+                     ItemTemplate="{StaticResource NavigationItemTemplate}"
                      Background="Transparent"
                      BorderThickness="0"
                      Margin="10,14,6,0"
@@ -212,6 +234,108 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+
+                    <Grid x:Name="UpdatesSection">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <StackPanel DataContext="{Binding Update}">
+                                <DockPanel>
+                                    <Image DockPanel.Dock="Left"
+                                           Source="/Assets/meerkat-app.ico"
+                                           Width="44"
+                                           Height="44"
+                                           RenderOptions.BitmapScalingMode="HighQuality"
+                                           Margin="0,0,14,0" />
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Headline}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Overlay.Hint}" />
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <DockPanel Margin="0,14,0,0"
+                                           Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock DockPanel.Dock="Right"
+                                               Text="{Binding ProgressText}"
+                                               FontFamily="{StaticResource Overlay.MonoFont}"
+                                               FontSize="11"
+                                               Margin="10,0,0,0"
+                                               Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" />
+                                    <TextBlock Text="{Binding StatusText}" Style="{StaticResource Overlay.Hint}" TextWrapping="Wrap" TextTrimming="None" />
+                                </DockPanel>
+                                <ProgressBar Style="{StaticResource Overlay.Meter}"
+                                             Height="4"
+                                             Margin="0,6,0,0"
+                                             Maximum="100"
+                                             Value="{Binding ProgressPercent, Mode=OneWay}"
+                                             Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <Button Style="{StaticResource Overlay.PrimaryButton}"
+                                            Content="Restart and install"
+                                            Margin="0,0,8,0"
+                                            Command="{Binding RestartAndInstallCommand}"
+                                            Visibility="{Binding IsInstallActionVisible, Converter={StaticResource BoolToVisibility}}" />
+                                    <Button Content="Install on exit"
+                                            Margin="0,0,8,0"
+                                            Command="{Binding InstallOnExitCommand}"
+                                            Visibility="{Binding IsReady, Converter={StaticResource BoolToVisibility}}" />
+                                    <Button Content="Cancel"
+                                            Margin="0,0,8,0"
+                                            Command="{Binding CancelDownloadCommand}"
+                                            Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" />
+                                    <Button Style="{StaticResource Overlay.PrimaryButton}"
+                                            Content="Download"
+                                            Margin="0,0,8,0"
+                                            Command="{Binding DownloadCommand}"
+                                            Visibility="{Binding CanDownload, Converter={StaticResource BoolToVisibility}}" />
+                                    <Button Content="Check now"
+                                            Command="{Binding CheckNowCommand}"
+                                            Visibility="{Binding CanCheck, Converter={StaticResource BoolToVisibility}}" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <CheckBox Margin="0,20,0,0"
+                                      Content="Check for updates automatically (at startup and every 24 h)"
+                                      IsChecked="{Binding CheckForUpdatesAutomatically}" />
+                            <CheckBox Margin="0,10,0,0"
+                                      Content="Download in the background"
+                                      IsChecked="{Binding DownloadUpdatesInBackground}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                <TextBlock Style="{StaticResource Overlay.FormLabel}" Text="Channel" Margin="0,0,12,0" />
+                                <ComboBox Width="130"
+                                          ItemsSource="{Binding Channels}"
+                                          SelectedItem="{Binding SelectedChannel}"
+                                          DisplayMemberPath="DisplayName" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1"
+                                    Width="230"
+                                    Margin="20,0,0,0"
+                                    DataContext="{Binding Update}"
+                                    Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="{Binding ReleaseNotesTitle}" FontWeight="SemiBold" />
+                            <Border Height="170"
+                                    Margin="0,8,0,8"
+                                    Padding="10,8"
+                                    CornerRadius="4"
+                                    BorderThickness="1"
+                                    BorderBrush="{StaticResource Overlay.Border}"
+                                    Background="{StaticResource Overlay.SurfaceRaised}">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+                                    <TextBlock Text="{Binding ReleaseNotes}" TextWrapping="Wrap" FontSize="11" />
+                                </ScrollViewer>
+                            </Border>
+                            <Button Style="{StaticResource LinkButton}"
+                                    Content="Full release notes"
+                                    HorizontalAlignment="Left"
+                                    Command="{Binding OpenReleaseNotesCommand}" />
+                        </StackPanel>
+                    </Grid>
                 </StackPanel>
             </ScrollViewer>
         </Grid>

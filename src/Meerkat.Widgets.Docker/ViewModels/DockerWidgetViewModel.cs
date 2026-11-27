@@ -31,6 +31,10 @@ public sealed partial class DockerWidgetViewModel(
     [ObservableProperty]
     private string _modeHotkeyText = string.Empty;
 
+    /// <summary>Message from the shell shown in the footer instead of the hotkey hint, e.g. a pending update.</summary>
+    [ObservableProperty]
+    private string? _notice;
+
     [ObservableProperty]
     private LogPanelViewModel? _logPanel;
 
@@ -306,5 +310,6 @@ public sealed partial class DockerWidgetViewModel(
     {
         IsInteractive = overlayState.Mode == OverlayMode.Interactive;
         ModeHotkeyText = overlayState.ModeHotkeyText;
+        Notice = overlayState.Notice;
     }
 }

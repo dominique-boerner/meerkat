@@ -191,12 +191,40 @@
                   Margin="8,6,4,0"
                   Visibility="{Binding IsDisplayMode, Converter={StaticResource BoolToVisibility}}">
                 <TextBlock Style="{DynamicResource Overlay.Hint}" FontSize="10" Text="{Binding IntervalText}" />
-                <TextBlock Style="{DynamicResource Overlay.Hint}" FontSize="10" HorizontalAlignment="Right">
+                <TextBlock x:Name="InteractHint" FontSize="10" HorizontalAlignment="Right">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource Overlay.Hint}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Notice}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
                     <Run Text="Interact:" />
                     <Run Text="{Binding ModeHotkeyText, Mode=OneWay}"
                          FontFamily="{DynamicResource Overlay.MonoFont}"
                          Foreground="{DynamicResource Overlay.Text}" />
                 </TextBlock>
+                <!-- A notice from the shell takes the place of the hint; it must work without any interaction. -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Notice}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <Ellipse Width="5" Height="5" Margin="0,1,6,0" Fill="{DynamicResource Overlay.Accent}" />
+                    <TextBlock Text="{Binding Notice}"
+                               FontSize="10"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource Overlay.Accent}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
             </Grid>
 
             <TextBlock DockPanel.Dock="Bottom"

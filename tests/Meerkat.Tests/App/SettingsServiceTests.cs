@@ -9,10 +9,13 @@ public sealed class SettingsServiceTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "Meerkat.Tests", Guid.NewGuid().ToString("N"));
 
+    private readonly UpdateTestContext _updates = new();
+
     private string FilePath => Path.Combine(_directory, "settings.json");
 
     public void Dispose()
     {
+        _updates.Dispose();
         if (Directory.Exists(_directory))
         {
             Directory.Delete(_directory, recursive: true);
@@ -101,6 +104,8 @@ public sealed class SettingsServiceTests : IDisposable
         var viewModel = CreateViewModel(service, docker);
 
         viewModel.ToggleModeHotkey = "Ctrl+Shift+F9";
+        viewModel.CheckForUpdatesAutomatically = false;
+        viewModel.SelectedChannel = viewModel.Channels.Single(option => option.Channel == UpdateChannel.Prerelease);
         docker.IsEnabled = false;
         docker.ResetPositionCommand.Execute(null);
         var saved = viewModel.TrySave();
@@ -109,6 +114,10 @@ public sealed class SettingsServiceTests : IDisposable
         var reloaded = new SettingsService(FilePath);
         Assert.Equal("Ctrl+Shift+F9", reloaded.Current.ToggleModeHotkey);
         Assert.Equal(["docker"], reloaded.Current.DisabledWidgets);
+        Assert.False(reloaded.Current.Updates.CheckAutomatically);
+        Assert.True(reloaded.Current.Updates.DownloadInBackground);
+        Assert.Equal(UpdateChannel.Prerelease, reloaded.Current.Updates.Channel);
+        Assert.Equal(["Hotkeys", "Appearance", "Widgets", "Updates"], viewModel.NavigationItems.Select(item => item.Title));
         Assert.Equal(["other"], reloaded.Current.Layouts["primary"].Keys);
     }
 
@@ -128,5 +137,5 @@ public sealed class SettingsServiceTests : IDisposable
     }
 
     private SettingsViewModel CreateViewModel(SettingsService service, params WidgetToggleViewModel[] widgets) =>
-        new(service, [new MonitorOption(null, "Primary monitor")], widgets, [], hotkeyWarning: null, FilePath);
+        new(service, [new MonitorOption(null, "Primary monitor")], widgets, [], _updates.ViewModel, hotkeyWarning: null, FilePath);
 }

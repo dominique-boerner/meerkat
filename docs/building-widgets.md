@@ -107,7 +107,7 @@ Request these through constructor injection.
 
 | Service | Use it to |
 |---|---|
-| `IOverlayState` | Read whether the overlay is visible and which mode is active, and react to changes through `Changed`. |
+| `IOverlayState` | Read whether the overlay is visible, which mode is active and whether the shell has a notice to show, and react to changes through `Changed`. |
 | `IWidgetSettingsStore` | Load and save a settings object for your widget. It is stored as JSON in the user's settings file. |
 | `IOverlayPanelHost` | Show an additional, independently movable panel such as a log viewer. Dispose the returned handle to close it. |
 | `IOverlayCommands` | Ask the shell to open the settings window. |
@@ -115,6 +115,9 @@ Request these through constructor injection.
 ## Behaving well on the overlay
 
 - **Pause when hidden.** Do not poll or render while `IOverlayState.IsVisible` is `false`.
+- **Show notices if you have room.** `IOverlayState.Notice` carries a short message from the shell,
+  such as a pending update. In display mode a widget is the only place it can appear, so show it
+  where you would otherwise show a hint.
 - **Respect the mode.** In display mode the overlay is click-through, so show actions only while
   `IOverlayState.Mode` is `OverlayMode.Interactive`.
 - **Keep the UI thread free.** `StartAsync`, `StopAsync` and all view code run on the UI thread;

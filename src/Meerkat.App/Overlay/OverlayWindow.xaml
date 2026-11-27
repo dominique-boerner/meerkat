@@ -145,6 +145,69 @@
             </ItemsControl.ItemContainerStyle>
         </ItemsControl>
 
+        <!-- Update card: only in interactive mode, where the user can actually respond to it. -->
+        <Border DataContext="{Binding Update}"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Width="430"
+                Padding="18,16"
+                CornerRadius="10"
+                Background="{StaticResource Overlay.SurfaceSolid}"
+                BorderBrush="{StaticResource Overlay.Border}"
+                BorderThickness="1"
+                TextElement.Foreground="{StaticResource Overlay.Text}">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding DataContext.IsInteractive, RelativeSource={RelativeSource AncestorType=Window}}" Value="True" />
+                                <Condition Binding="{Binding IsCardVisible}" Value="True" />
+                            </MultiDataTrigger.Conditions>
+                            <Setter Property="Visibility" Value="Visible" />
+                        </MultiDataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <StackPanel>
+                <DockPanel>
+                    <Button DockPanel.Dock="Right"
+                            Style="{StaticResource Overlay.IconButton}"
+                            Content="&#xE8BB;"
+                            ToolTip="Dismiss"
+                            VerticalAlignment="Top"
+                            Command="{Binding DismissCardCommand}" />
+                    <Image DockPanel.Dock="Left"
+                           Source="/Assets/meerkat-app.ico"
+                           Width="34"
+                           Height="34"
+                           RenderOptions.BitmapScalingMode="HighQuality"
+                           Margin="0,0,12,0" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding CardTitle}" FontSize="14" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding CardSubtitle}" Style="{StaticResource Overlay.Hint}" />
+                    </StackPanel>
+                </DockPanel>
+                <ItemsControl ItemsSource="{Binding Highlights}" Margin="46,10,0,0" Focusable="False">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock TextWrapping="Wrap" Margin="0,2">
+                                <Run Text="•" />
+                                <Run Text="{Binding Mode=OneWay}" />
+                            </TextBlock>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <StackPanel Orientation="Horizontal" Margin="46,14,0,0">
+                    <Button Style="{StaticResource Overlay.PrimaryButton}"
+                            Content="Restart and install"
+                            Command="{Binding RestartAndInstallCommand}" />
+                    <Button Content="On exit" Margin="8,0,0,0" Command="{Binding InstallOnExitCommand}" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
         <Border HorizontalAlignment="Center"
                 VerticalAlignment="Top"
                 Margin="0,10,0,0"

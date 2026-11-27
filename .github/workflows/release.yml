@@ -40,7 +40,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $arguments = @($env:TAG, '--title', "Meerkat $env:VERSION", '--generate-notes', '--verify-tag')
+          $arguments = @($env:TAG, '--title', "Meerkat $env:VERSION", '--verify-tag')
+          # The changelog section is what the in-app updater shows; fall back to generated notes without one.
+          $notes = ./build/Get-ReleaseNotes.ps1 -Version $env:VERSION
+          if ($notes) {
+            $notesFile = Join-Path $env:RUNNER_TEMP 'release-notes.md'
+            Set-Content -LiteralPath $notesFile -Value $notes -Encoding utf8
+            $arguments += '--notes-file', $notesFile
+          } else {
+            $arguments += '--generate-notes'
+          }
           # Versions with a suffix (e.g. 1.2.0-beta.1) are published as pre-releases.
           if ($env:VERSION.Contains('-')) { $arguments += '--prerelease' }
           $assets = Get-ChildItem artifacts -File | ForEach-Object FullName

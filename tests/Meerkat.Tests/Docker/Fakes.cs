@@ -43,6 +43,8 @@ internal sealed class FakeOverlayState : IOverlayState
 
     public string ModeHotkeyText => "Ctrl+Alt+O";
 
+    public string? Notice { get; set; }
+
     public event EventHandler? Changed;
 
     public void Set(bool isVisible, OverlayMode mode = OverlayMode.Display)

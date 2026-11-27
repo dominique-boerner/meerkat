@@ -62,8 +62,11 @@ public partial class SettingsWindow : Window
             shellSections[index].Visibility = ToVisibility(index == selectedIndex);
         }
 
+        // The navigation lists the shell sections, then the widget pages, then the update page.
         var selectedWidgetIndex = selectedIndex - shellSections.Length;
-        WidgetSections.Visibility = ToVisibility(selectedWidgetIndex >= 0);
+        var isWidgetPage = selectedWidgetIndex >= 0 && selectedWidgetIndex < WidgetSections.Items.Count;
+        WidgetSections.Visibility = ToVisibility(isWidgetPage);
+        UpdatesSection.Visibility = ToVisibility(selectedWidgetIndex >= WidgetSections.Items.Count);
 
         // Item containers are only generated once the list has been laid out while visible.
         WidgetSections.UpdateLayout();

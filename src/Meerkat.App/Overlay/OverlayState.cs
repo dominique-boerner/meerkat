@@ -32,6 +32,17 @@ public sealed class OverlayState : IOverlayState
         }
     }
 
+    public string? Notice { get; private set; }
+
+    public void SetNotice(string? notice)
+    {
+        if (Notice != notice)
+        {
+            Notice = notice;
+            Changed?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
     public void SetHotkeyTexts(string modeHotkeyText, string visibilityHotkeyText)
     {
         ModeHotkeyText = modeHotkeyText;

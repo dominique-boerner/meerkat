@@ -27,6 +27,7 @@ running inside WSL.
 - Tray icon with quick access to both modes, the settings and exit
 - Per-monitor DPI aware; widget positions and sizes are stored per monitor
 - A failing widget is suspended and can be restarted without affecting the shell or other widgets
+- Updates itself from GitHub releases, with checksum verification and installation on request
 
 **Docker widget**
 
@@ -71,6 +72,21 @@ settings each widget contributes.
 
 Everything is stored as JSON in `%AppData%\Meerkat\settings.json`. Errors are logged to
 `%AppData%\Meerkat\error.log`.
+
+### Updates
+
+Meerkat keeps itself up to date. At startup and once a day it asks the GitHub API for the releases of
+this repository, downloads a newer version in the background and verifies it against the published
+SHA-256 checksum. Nothing is installed without your consent:
+
+- In display mode a hint in the widget footer and a dot on the tray icon show that an update is ready.
+- In interactive mode a card offers to restart and install now, or to install when Meerkat exits.
+- The *Updates* page of the settings shows the release notes and lets you turn off the automatic
+  check or the background download and switch to the pre-release channel.
+
+The update check is the only network request Meerkat makes on its own. It contacts `api.github.com`
+and `github.com` and sends no data besides the request itself. Updating requires write access to the
+folder `Meerkat.exe` is in, and is only available in the published single-file builds.
 
 ### Docker widget
 
@@ -126,6 +142,9 @@ tests, publishes both archives with SHA-256 checksums and creates the GitHub rel
 git tag v1.0.0
 git push origin v1.0.0
 ```
+
+Before tagging, move the entries under `Unreleased` in [CHANGELOG.md](CHANGELOG.md) to a section for
+the new version. That section becomes the release text and is what the in-app updater shows.
 
 Tags with a suffix, such as `v1.0.0-beta.1`, are published as pre-releases. To produce the same
 archives locally, run `./build/Publish-Release.ps1 -Version 1.0.0`.
