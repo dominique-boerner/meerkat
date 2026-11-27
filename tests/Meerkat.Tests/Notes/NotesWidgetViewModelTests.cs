@@ -144,6 +144,75 @@ public class NotesWidgetViewModelTests
     }
 
     [Fact]
+    public void CommitAndInsertBelow_ContinuesInANewBlockRightBelow()
+    {
+        _store.Write("Ideas", "first\n\nlast\n");
+        var viewModel = Start();
+        viewModel.SelectCommand.Execute(viewModel.Notes[1]);
+
+        viewModel.BeginEdit(viewModel.Blocks[0]);
+        viewModel.Blocks[0].EditText = "first, edited\n\nand split";
+        viewModel.CommitAndInsertBelow();
+
+        // The new block follows everything the edited one turned into, not just its old position.
+        Assert.Equal(["first, edited", "and split", string.Empty, "last"], viewModel.Blocks.Select(block => block.Source.Text));
+        Assert.True(viewModel.Blocks[2].IsEditing);
+
+        viewModel.Blocks[2].EditText = "second";
+        viewModel.CommitAndInsertBelow();
+        Assert.Equal("first, edited\n\nand split\n\nsecond\n\nlast\n", _store.Read("Ideas"));
+        Assert.True(viewModel.Blocks[3].IsEditing);
+
+        // Leaving the new block empty ends the series without a trace.
+        viewModel.CommitEditing();
+        Assert.Equal(["first, edited", "and split", "second", "last"], viewModel.Blocks.Select(block => block.Source.Text));
+        Assert.Equal("first, edited\n\nand split\n\nsecond\n\nlast\n", _store.Read("Ideas"));
+    }
+
+    [Fact]
+    public void EditAdjacent_MovesThroughTheBlocksAndStartsANewOneAtTheEnd()
+    {
+        _store.Write("Ideas", "first\n\nsecond\n");
+        var viewModel = Start();
+        viewModel.SelectCommand.Execute(viewModel.Notes[1]);
+
+        viewModel.BeginEdit(viewModel.Blocks[0]);
+        viewModel.Blocks[0].EditText = "first, edited";
+        viewModel.EditAdjacent(1);
+        Assert.Equal("first, edited\n\nsecond\n", _store.Read("Ideas"));
+        Assert.Equal("second", viewModel.Blocks.Single(block => block.IsEditing).Source.Text);
+
+        viewModel.EditAdjacent(-1);
+        Assert.Equal("first, edited", viewModel.Blocks.Single(block => block.IsEditing).Source.Text);
+
+        // Above the first block there is nothing, so the editing stays where it is.
+        viewModel.EditAdjacent(-1);
+        Assert.Equal("first, edited", viewModel.Blocks.Single(block => block.IsEditing).Source.Text);
+
+        viewModel.EditAdjacent(1);
+        viewModel.EditAdjacent(1);
+        Assert.Equal(3, viewModel.Blocks.Count);
+        Assert.True(viewModel.Blocks[2].IsEditing);
+
+        // An empty block at the end is not followed by yet another one.
+        viewModel.EditAdjacent(1);
+        Assert.Equal(2, viewModel.Blocks.Count);
+        Assert.DoesNotContain(viewModel.Blocks, block => block.IsEditing);
+    }
+
+    [Fact]
+    public void EditAdjacent_SkipsTheHiddenDateLineOfToday()
+    {
+        _store.Write(Scratchpad, "## Tasks\n\n## Quick notes\n\n### 2026-11-27\n\n- 09:00 A\n");
+        var viewModel = Start();
+
+        viewModel.BeginEdit(viewModel.Blocks[1]);
+        viewModel.EditAdjacent(1);
+
+        Assert.Equal("- 09:00 A", viewModel.Blocks.Single(block => block.IsEditing).Source.Text);
+    }
+
+    [Fact]
     public void TogglingATask_ChecksItInTheFile()
     {
         _store.Write(Scratchpad, "## Tasks\n\n- [ ] A\n- [ ] B\n\n## Quick notes\n");

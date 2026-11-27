@@ -14,6 +14,12 @@ The section of a version becomes the text of its GitHub release and is what Meer
 - Meerkat can start when you sign in to Windows. Switch it on in the settings under *General*, the
   page formerly called *Appearance*.
 
+### Changed
+
+- Notes can be written with the keyboard alone: `Ctrl+Enter` continues in a new block below, `Tab`,
+  `Shift+Tab` and the arrow keys move between blocks, and after `Esc` the block stays selected so
+  that `Enter` opens it again.
+
 ## [1.5.0] - 2026-11-27
 
 ### Added

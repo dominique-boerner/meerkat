@@ -180,6 +180,75 @@ public sealed partial class NotesWidgetViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Saves the block being edited and continues in a new, empty block right below it, so that writing
+    /// several blocks in a row needs no mouse.
+    /// </summary>
+    public void CommitAndInsertBelow()
+    {
+        if (CommitAndLocate() is not { } position)
+        {
+            return;
+        }
+
+        var block = CreateBlock(new MarkdownBlock(string.Empty, 1));
+        block.IsEditing = true;
+        Blocks.Insert(Math.Min(position.After, Blocks.Count), block);
+    }
+
+    /// <summary>
+    /// Saves the block being edited and continues editing its neighbour: the next block for a positive
+    /// direction, the previous one otherwise. Past the last block a new one is started.
+    /// </summary>
+    public void EditAdjacent(int direction)
+    {
+        if (CommitAndLocate() is not { } position)
+        {
+            return;
+        }
+
+        var step = direction > 0 ? 1 : -1;
+        var index = step > 0 ? position.After : position.Before - 1;
+
+        // Blocks that are not shown, such as the date line of today, cannot be edited in place.
+        while (index >= 0 && index < Blocks.Count && Blocks[index].IsHidden)
+        {
+            index += step;
+        }
+
+        if (index >= 0 && index < Blocks.Count)
+        {
+            BeginEdit(Blocks[index]);
+        }
+        else if (step > 0 && !position.WasEmpty)
+        {
+            AddBlock();
+        }
+        else if (step < 0 && position.Before < Blocks.Count)
+        {
+            // There is nothing above the first block; the editing simply continues where it was.
+            BeginEdit(Blocks[position.Before]);
+        }
+    }
+
+    /// <summary>
+    /// Commits the block being edited and tells where it was: the index it started at and the index right
+    /// behind what it turned into, which may be several blocks or, if it was left empty, none.
+    /// </summary>
+    private (int Before, int After, bool WasEmpty)? CommitAndLocate()
+    {
+        if (Blocks.FirstOrDefault(candidate => candidate.IsEditing) is not { } block)
+        {
+            return null;
+        }
+
+        var index = Blocks.IndexOf(block);
+        var count = Blocks.Count;
+        var wasEmpty = string.IsNullOrWhiteSpace(block.EditText);
+        CommitEditing();
+        return (index, Math.Clamp(index + 1 + (Blocks.Count - count), 0, Blocks.Count), wasEmpty);
+    }
+
     /// <summary>Renames the open note. Returns false, leaving everything as it was, if the title cannot be used.</summary>
     public bool Rename(string newTitle)
     {

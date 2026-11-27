@@ -179,6 +179,11 @@ settings. The page in the panel shows a note rendered. Click a block to edit its
 elsewhere or press `Esc` to finish; check boxes can be ticked directly. Changes are saved right away,
 and changes made to the files by other programs show up on their own.
 
+The page can be used with the keyboard alone. While editing, `Ctrl+Enter` saves the block and starts
+a new one right below it, `Tab` and `Shift+Tab` move to the next and the previous block, and so do the
+arrow keys from the last and the first line. `Esc` ends the editing and leaves the block selected:
+the arrow keys then move from block to block and `Enter` opens one again.
+
 The *scratchpad* is always there and cannot be deleted. It has two sections that Meerkat writes to:
 
 - `Ctrl+Alt+T` opens an input field for a task, which is appended to **Tasks**.

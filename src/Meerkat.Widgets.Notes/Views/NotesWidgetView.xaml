@@ -11,10 +11,10 @@
         <SolidColorBrush x:Key="CodeSurface" Color="#FF0E1014" />
 
         <DataTemplate x:Key="NoteItem">
-            <Button Command="{Binding DataContext.SelectCommand, ElementName=Root}" CommandParameter="{Binding}" Cursor="Hand" Focusable="False">
+            <Button Command="{Binding DataContext.SelectCommand, ElementName=Root}" CommandParameter="{Binding}" Cursor="Hand" FocusVisualStyle="{x:Null}">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Chrome" Background="Transparent" CornerRadius="6" Padding="10,7" Margin="0,1">
+                        <Border x:Name="Chrome" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="6" Padding="9,6" Margin="0,1">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock x:Name="Pin"
@@ -33,6 +33,9 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Overlay.SurfaceRaised}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource Overlay.Accent}" />
                             </Trigger>
                             <DataTrigger Binding="{Binding IsSelected}" Value="True">
                                 <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Overlay.Hover}" />
@@ -125,7 +128,13 @@
 
         <!-- A block is shown rendered; a click turns it into its Markdown source until the focus moves on. -->
         <DataTemplate x:Key="Block">
-            <Grid x:Name="BlockRoot" Background="Transparent" Cursor="IBeam" MouseLeftButtonUp="OnBlockClicked">
+<Grid x:Name="BlockRoot"
+                  Background="Transparent"
+                  Cursor="IBeam"
+                  Focusable="True"
+                  FocusVisualStyle="{x:Null}"
+                  MouseLeftButtonUp="OnBlockClicked"
+                  KeyDown="OnBlockKeyDown">
                 <Rectangle x:Name="Outline"
                            Stroke="{DynamicResource Overlay.Border}"
                            StrokeDashArray="3 3"
@@ -138,7 +147,6 @@
                 <TextBox x:Name="Editor"
                          Text="{Binding EditText, UpdateSourceTrigger=PropertyChanged}"
                          AcceptsReturn="True"
-                         AcceptsTab="True"
                          TextWrapping="Wrap"
                          FontFamily="{DynamicResource Overlay.MonoFont}"
                          FontSize="12"
@@ -159,6 +167,10 @@
                 </DataTrigger>
                 <Trigger SourceName="BlockRoot" Property="IsMouseOver" Value="True">
                     <Setter TargetName="Outline" Property="Visibility" Value="Visible" />
+                </Trigger>
+                <Trigger SourceName="BlockRoot" Property="IsKeyboardFocused" Value="True">
+                    <Setter TargetName="Outline" Property="Visibility" Value="Visible" />
+                    <Setter TargetName="Outline" Property="Stroke" Value="{DynamicResource Overlay.Accent}" />
                 </Trigger>
                 <DataTrigger Binding="{Binding IsEditing}" Value="True">
                     <Setter TargetName="Rendered" Property="Visibility" Value="Collapsed" />
@@ -206,7 +218,7 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
                     <StackPanel>
                         <ItemsControl ItemsSource="{Binding Notes}" ItemTemplate="{StaticResource NoteItem}" Focusable="False" />
-                        <Button Command="{Binding NewNoteCommand}" Cursor="Hand" Margin="0,8,0,0" Focusable="False">
+                        <Button Command="{Binding NewNoteCommand}" Cursor="Hand" Margin="0,8,0,0" FocusVisualStyle="{x:Null}">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
                                     <Grid Background="Transparent">
@@ -217,6 +229,10 @@
                                         <Trigger Property="IsMouseOver" Value="True">
                                             <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource Overlay.Text}" />
                                             <Setter TargetName="Frame" Property="Stroke" Value="{DynamicResource Overlay.TextMuted}" />
+                                        </Trigger>
+                                        <Trigger Property="IsKeyboardFocused" Value="True">
+                                            <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource Overlay.Text}" />
+                                            <Setter TargetName="Frame" Property="Stroke" Value="{DynamicResource Overlay.Accent}" />
                                         </Trigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate>
@@ -306,14 +322,38 @@
             </Border>
 
             <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource Overlay.Border}" BorderThickness="0,1,0,0" Padding="16,6">
-                <TextBlock Text="{Binding PathText}" FontFamily="{DynamicResource Overlay.MonoFont}" FontSize="10.5" Foreground="{DynamicResource Overlay.TextMuted}" TextTrimming="CharacterEllipsis" />
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Right" Text="Ctrl+Enter new block · Tab next · Esc done" FontSize="10.5" Foreground="{DynamicResource Overlay.TextMuted}" Margin="12,0,0,0" />
+                    <TextBlock Text="{Binding PathText}" FontFamily="{DynamicResource Overlay.MonoFont}" FontSize="10.5" Foreground="{DynamicResource Overlay.TextMuted}" TextTrimming="CharacterEllipsis" />
+                </DockPanel>
             </Border>
 
             <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
                 <StackPanel Margin="18,8,18,12">
-                    <ItemsControl ItemsSource="{Binding Blocks}" ItemTemplate="{StaticResource Block}" Focusable="False" />
-                    <Border Background="Transparent" Cursor="IBeam" MinHeight="72" Margin="0,8,0,0" MouseLeftButtonUp="OnAddBlockClicked">
-                        <TextBlock Text="Click to write …" Foreground="{DynamicResource Overlay.TextMuted}" Opacity="0.7" Margin="0,4" />
+                    <ItemsControl x:Name="BlockList" ItemsSource="{Binding Blocks}" ItemTemplate="{StaticResource Block}" Focusable="False" />
+                    <Border x:Name="AddArea"
+                            Background="Transparent"
+                            Cursor="IBeam"
+                            MinHeight="72"
+                            Margin="0,8,0,0"
+                            Focusable="True"
+                            FocusVisualStyle="{x:Null}"
+                            MouseLeftButtonUp="OnAddBlockClicked"
+                            KeyDown="OnAddAreaKeyDown">
+                        <TextBlock Text="Click or press Enter to write …" Margin="0,4">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{DynamicResource Overlay.TextMuted}" />
+                                    <Setter Property="Opacity" Value="0.7" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsKeyboardFocused, ElementName=AddArea}" Value="True">
+                                            <Setter Property="Foreground" Value="{DynamicResource Overlay.Accent}" />
+                                            <Setter Property="Opacity" Value="1" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                     </Border>
                 </StackPanel>
             </ScrollViewer>
