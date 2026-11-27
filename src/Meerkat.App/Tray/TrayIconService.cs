@@ -1,7 +1,7 @@
-using System.Drawing.Drawing2D;
+using System.Windows;
 using Meerkat.Abstractions;
-using Meerkat.App.Interop;
 using Meerkat.App.Overlay;
+using Microsoft.Win32;
 using Drawing = System.Drawing;
 using WinForms = System.Windows.Forms;
 
@@ -10,20 +10,23 @@ namespace Meerkat.App.Tray;
 public sealed class TrayIconService : IDisposable
 {
     private const int BalloonTimeoutMilliseconds = 5000;
-    private const int IconSize = 32;
+    private const string PersonalizeKey = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
+    private const string SystemUsesLightThemeValue = "SystemUsesLightTheme";
 
     private static readonly Drawing.Color Surface = Drawing.Color.FromArgb(0x1C, 0x1F, 0x26);
     private static readonly Drawing.Color Hover = Drawing.Color.FromArgb(0x2B, 0x30, 0x3A);
     private static readonly Drawing.Color Text = Drawing.Color.FromArgb(0xE6, 0xE8, 0xEC);
     private static readonly Drawing.Color TextMuted = Drawing.Color.FromArgb(0x8B, 0x93, 0xA1);
-    private static readonly Drawing.Color Accent = Drawing.Color.FromArgb(0x5B, 0xB6, 0xFF);
 
     private readonly OverlayState _state;
     private readonly WinForms.NotifyIcon _notifyIcon;
     private readonly WinForms.ContextMenuStrip _menu;
     private readonly WinForms.ToolStripMenuItem _visibilityItem;
     private readonly WinForms.ToolStripMenuItem _modeItem;
-    private readonly Drawing.Icon _icon;
+
+    // Named after the icon's own color: the light icon is for a dark taskbar and vice versa.
+    private readonly Drawing.Icon _lightIcon = LoadIcon("meerkat-tray-light.ico");
+    private readonly Drawing.Icon _darkIcon = LoadIcon("meerkat-tray-dark.ico");
 
     public TrayIconService(OverlayState state)
     {
@@ -50,16 +53,16 @@ public sealed class TrayIconService : IDisposable
         });
         _menu.Items.AddRange([_visibilityItem, _modeItem, new WinForms.ToolStripSeparator(), settingsItem, new WinForms.ToolStripSeparator(), exitItem]);
 
-        _icon = CreateIcon();
         _notifyIcon = new WinForms.NotifyIcon
         {
-            Icon = _icon,
+            Icon = SelectIcon(),
             Text = "Meerkat",
             ContextMenuStrip = _menu,
             Visible = true,
         };
         _notifyIcon.DoubleClick += (_, _) => ToggleVisibilityRequested?.Invoke(this, EventArgs.Empty);
 
+        SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
         _state.Changed += OnStateChanged;
         OnStateChanged(this, EventArgs.Empty);
     }
@@ -77,14 +80,15 @@ public sealed class TrayIconService : IDisposable
 
     public void Dispose()
     {
+        SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
         _state.Changed -= OnStateChanged;
 
         // Hiding first removes the icon immediately instead of leaving a ghost until the tray is hovered.
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
         _menu.Dispose();
-        NativeMethods.DestroyIcon(_icon.Handle);
-        _icon.Dispose();
+        _lightIcon.Dispose();
+        _darkIcon.Dispose();
     }
 
     private static WinForms.ToolStripMenuItem CreateItem(Action onClick)
@@ -94,20 +98,29 @@ public sealed class TrayIconService : IDisposable
         return item;
     }
 
-    private static Drawing.Icon CreateIcon()
+    private static Drawing.Icon LoadIcon(string fileName)
     {
-        using var bitmap = new Drawing.Bitmap(IconSize, IconSize);
-        using (var graphics = Drawing.Graphics.FromImage(bitmap))
-        {
-            graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using var frame = new Drawing.Pen(Accent, 3);
-            using var fill = new Drawing.SolidBrush(Accent);
-            graphics.DrawRectangle(frame, 3, 6, 26, 20);
-            graphics.FillRectangle(fill, 8, 11, 16, 3);
-            graphics.FillRectangle(fill, 8, 17, 10, 3);
-        }
+        var resource = Application.GetResourceStream(new Uri($"Assets/{fileName}", UriKind.Relative))
+            ?? throw new InvalidOperationException($"Icon resource '{fileName}' is missing.");
+        using var stream = resource.Stream;
+        return new Drawing.Icon(stream, WinForms.SystemInformation.SmallIconSize);
+    }
 
-        return Drawing.Icon.FromHandle(bitmap.GetHicon());
+    private static bool IsTaskbarLight()
+    {
+        using var key = Registry.CurrentUser.OpenSubKey(PersonalizeKey);
+        return key?.GetValue(SystemUsesLightThemeValue) is 1;
+    }
+
+    private Drawing.Icon SelectIcon() => IsTaskbarLight() ? _darkIcon : _lightIcon;
+
+    private void OnUserPreferenceChanged(object? sender, UserPreferenceChangedEventArgs e)
+    {
+        // Switching between the light and dark Windows theme is reported in the General category.
+        if (e.Category == UserPreferenceCategory.General)
+        {
+            _notifyIcon.Icon = SelectIcon();
+        }
     }
 
     private void OnStateChanged(object? sender, EventArgs e)

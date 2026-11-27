@@ -5,10 +5,14 @@
     <!-- Windows Forms is only used for the tray icon and monitor enumeration. -->
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\meerkat-app.ico</ApplicationIcon>
     <AssemblyName>Meerkat</AssemblyName>
     <!-- WFO0003 assumes a Windows Forms app; WPF needs the manifest for per-monitor DPI awareness. -->
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
   </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets\*.ico" />
+  </ItemGroup>
   <ItemGroup>
     <Using Remove="System.Windows.Forms" />
     <Using Remove="System.Drawing" />

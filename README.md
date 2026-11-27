@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo/meerkat-tile.svg" width="112" height="112" alt="Meerkat logo">
+</p>
+
 # Meerkat
 
 [![CI](https://github.com/dominique-boerner/meerkat/actions/workflows/ci.yml/badge.svg)](https://github.com/dominique-boerner/meerkat/actions/workflows/ci.yml)
