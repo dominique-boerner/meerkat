@@ -66,6 +66,19 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal("Ctrl+Alt+M", settings.TogglePanelHotkey);
     }
 
+    [Theory]
+    [InlineData(900, 900)]
+    [InlineData(100, OverlaySettings.MinimumPanelWidth)]
+    [InlineData(double.NaN, OverlaySettings.DefaultPanelWidth)]
+    public void PanelWidth_IsKeptWideEnoughForTheWidgetPages(double stored, double expected)
+    {
+        var service = new SettingsService(FilePath);
+        service.Current.PanelWidth = stored;
+
+        Assert.Equal(expected, service.Current.EffectivePanelWidth);
+        Assert.Equal(OverlaySettings.DefaultPanelWidth, new OverlaySettings().PanelWidth);
+    }
+
     [Fact]
     public void CorruptFile_FallsBackToDefaults()
     {

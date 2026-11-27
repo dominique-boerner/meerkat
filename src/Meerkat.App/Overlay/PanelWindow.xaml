@@ -211,6 +211,33 @@
                 </Grid>
             </DockPanel>
         </Grid>
+
+        <!-- The left edge is the only free one of a docked panel; dragging it changes the width. -->
+        <Thumb Grid.RowSpan="2"
+               Width="7"
+               HorizontalAlignment="Left"
+               Cursor="SizeWE"
+               ToolTip="Drag to resize, double-click to reset"
+               DragStarted="OnResizeStarted"
+               DragDelta="OnResizeDelta"
+               DragCompleted="OnResizeCompleted"
+               MouseDoubleClick="OnResizeReset">
+            <Thumb.Template>
+                <ControlTemplate TargetType="Thumb">
+                    <Border Background="Transparent">
+                        <Border x:Name="Line" Width="2" HorizontalAlignment="Left" Background="Transparent" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Line" Property="Background" Value="{StaticResource Overlay.Accent}" />
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="Line" Property="Background" Value="{StaticResource Overlay.Accent}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Thumb.Template>
+        </Thumb>
     </Grid>
     </Border>
 </Window>

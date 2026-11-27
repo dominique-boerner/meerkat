@@ -25,6 +25,9 @@ The section of a version becomes the text of its GitHub release and is what Meer
 - Hotkeys are assigned by clicking a field and pressing the combination. Meerkat's own hotkeys are
   released while recording, so the current combinations can be pressed without triggering them.
 
+- The panel can be made wider or narrower by dragging its left edge, which helps when reading logs.
+  The width is remembered; double-clicking the edge restores the default.
+
 ### Removed
 
 - Display and interactive mode, moving and resizing widgets, and the layouts stored per monitor.

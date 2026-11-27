@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -18,6 +19,9 @@ public partial class PanelWindow : Window
     // Identifies the most recent animation, so that a superseded one does not hide a panel that was reopened.
     private int _animationVersion;
 
+    private int _resizeStartCursor;
+    private double _resizeStartWidth;
+
     public PanelWindow()
     {
         InitializeComponent();
@@ -25,6 +29,15 @@ public partial class PanelWindow : Window
 
     /// <summary>Raised when the user leaves the panel, by pressing Escape or by switching to another window.</summary>
     public event EventHandler? Dismissed;
+
+    /// <summary>
+    /// Raised while the user drags the panel's edge, with the requested width in device-independent pixels;
+    /// null asks for the default width.
+    /// </summary>
+    public event EventHandler<double?>? WidthRequested;
+
+    /// <summary>Raised when the user finished resizing, so the width can be saved.</summary>
+    public event EventHandler? WidthCommitted;
 
     /// <summary>Positions the window using physical pixels of the virtual screen.</summary>
     public void MoveToBounds(System.Drawing.Rectangle physicalBounds) => NativeMethods.SetWindowPos(
@@ -103,6 +116,30 @@ public partial class PanelWindow : Window
             Dismissed?.Invoke(this, EventArgs.Empty);
         }
     }
+
+    private void OnResizeStarted(object sender, DragStartedEventArgs e)
+    {
+        _resizeStartCursor = GetCursorX();
+        _resizeStartWidth = ActualWidth;
+    }
+
+    private void OnResizeDelta(object sender, DragDeltaEventArgs e)
+    {
+        // The edge being dragged moves with the window, so the drag is measured against the screen
+        // instead of the window; that keeps the edge under the cursor without jitter.
+        var scale = VisualTreeHelper.GetDpi(this).DpiScaleX;
+        WidthRequested?.Invoke(this, _resizeStartWidth + ((_resizeStartCursor - GetCursorX()) / scale));
+    }
+
+    private void OnResizeCompleted(object sender, DragCompletedEventArgs e) => WidthCommitted?.Invoke(this, EventArgs.Empty);
+
+    private void OnResizeReset(object sender, MouseButtonEventArgs e)
+    {
+        WidthRequested?.Invoke(this, null);
+        WidthCommitted?.Invoke(this, EventArgs.Empty);
+    }
+
+    private static int GetCursorX() => NativeMethods.GetCursorPos(out var position) ? position.X : 0;
 
     private double SlideDistance => PanelRoot.ActualWidth > 0 ? PanelRoot.ActualWidth : FallbackSlideDistance;
 

@@ -77,7 +77,8 @@ Meerkat shows its status bar in the top right corner and adds an icon to the not
 | Hide or show Meerkat | `Ctrl+Alt+H` |
 
 The panel closes when you press `Esc`, press the hotkey again or switch to another window. Pin it to
-keep it open next to your work. Both actions are also available from the tray icon.
+keep it open next to your work. Drag its left edge to change the width, for example to read long log
+lines; a double-click on the edge restores the default. Both actions are also available from the tray icon.
 
 ### Configuration
 

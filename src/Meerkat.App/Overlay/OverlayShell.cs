@@ -30,7 +30,6 @@ public sealed class OverlayShell(
     private const int TogglePanelHotkeyId = 1;
     private const int ToggleVisibilityHotkeyId = 2;
     private const double MinimumOpacity = 0.2;
-    private const double PanelWidth = 680;
 
     private static readonly TimeSpan WidgetStopTimeout = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan AgeRefreshInterval = TimeSpan.FromSeconds(30);
@@ -50,6 +49,8 @@ public sealed class OverlayShell(
         _statusBarWindow = new StatusBarWindow { DataContext = statusBar };
         _panelWindow = new PanelWindow { DataContext = panel };
         _panelWindow.Dismissed += (_, _) => SetPanelOpen(false);
+        _panelWindow.WidthRequested += (_, width) => ResizePanel(width);
+        _panelWindow.WidthCommitted += (_, _) => SavePanelWidth();
 
         panel.CloseRequested += (_, _) => SetPanelOpen(false);
         panel.SettingsRequested += (_, _) => OpenSettings();
@@ -225,12 +226,32 @@ public sealed class OverlayShell(
         state.SetPanelOpen(isOpen);
         if (isOpen)
         {
-            _panelWindow.MoveToBounds(MonitorLocator.ResolvePanelBounds(settings.Current.Monitor, PanelWidth));
+            _panelWindow.MoveToBounds(MonitorLocator.ResolvePanelBounds(settings.Current.Monitor, settings.Current.EffectivePanelWidth));
             _panelWindow.Open();
         }
         else
         {
             _panelWindow.Dismiss(animated);
+        }
+    }
+
+    private void ResizePanel(double? width)
+    {
+        settings.Current.PanelWidth = width ?? OverlaySettings.DefaultPanelWidth;
+        _panelWindow?.MoveToBounds(MonitorLocator.ResolvePanelBounds(settings.Current.Monitor, settings.Current.EffectivePanelWidth));
+    }
+
+    private void SavePanelWidth()
+    {
+        // Keep what is stored within the limits that were applied while dragging.
+        settings.Current.PanelWidth = settings.Current.EffectivePanelWidth;
+        try
+        {
+            settings.Save();
+        }
+        catch (Exception exception)
+        {
+            errorLog.Write("Saving the panel width failed", exception);
         }
     }
 
@@ -353,7 +374,7 @@ public sealed class OverlayShell(
         _statusBarWindow?.MoveToBounds(MonitorLocator.ResolveWorkingArea(monitor));
         if (state.IsPanelOpen)
         {
-            _panelWindow?.MoveToBounds(MonitorLocator.ResolvePanelBounds(monitor, PanelWidth));
+            _panelWindow?.MoveToBounds(MonitorLocator.ResolvePanelBounds(monitor, settings.Current.EffectivePanelWidth));
         }
     }
 
