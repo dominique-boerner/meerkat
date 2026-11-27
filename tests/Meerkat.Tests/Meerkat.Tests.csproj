@@ -19,5 +19,6 @@
     <ProjectReference Include="..\..\src\Meerkat.Widgets.Git\Meerkat.Widgets.Git.csproj" />
     <ProjectReference Include="..\..\src\Meerkat.Widgets.Notes\Meerkat.Widgets.Notes.csproj" />
     <ProjectReference Include="..\..\src\Meerkat.Widgets.Server\Meerkat.Widgets.Server.csproj" />
+    <ProjectReference Include="..\..\src\Meerkat.Widgets.Services\Meerkat.Widgets.Services.csproj" />
   </ItemGroup>
 </Project>

@@ -16,7 +16,11 @@ public sealed record WidgetStatus(string Label, string Summary, WidgetSeverity S
 
 /// <summary>Something that needs the user's attention.</summary>
 /// <param name="Since">When the condition was first observed; shown as its age.</param>
-public sealed record WidgetAlert(WidgetSeverity Severity, string Title, string Detail, DateTimeOffset Since);
+/// <param name="Prominent">
+/// Shows a warning as a card in the status bar, as errors always are. Meant for the rare warning that
+/// explains trouble the user is about to run into, such as a disturbance of a service they depend on.
+/// </param>
+public sealed record WidgetAlert(WidgetSeverity Severity, string Title, string Detail, DateTimeOffset Since, bool Prominent = false);
 
 /// <summary>
 /// Something the user chose to keep in view below the status bar, such as a task list. The status bar

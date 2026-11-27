@@ -103,14 +103,23 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <Grid Grid.Column="0" Width="18" Height="18" Margin="0,0,12,0" VerticalAlignment="Center">
-                        <Ellipse Fill="{StaticResource Overlay.Danger}" />
-                        <TextBlock Text="&#xE711;"
+                        <Ellipse x:Name="Badge" Fill="{StaticResource Overlay.Danger}" />
+                        <TextBlock x:Name="ErrorGlyph"
+                                   Text="&#xE711;"
                                    FontFamily="{StaticResource Overlay.IconFont}"
                                    FontSize="9"
                                    FontWeight="Bold"
                                    Foreground="{StaticResource Overlay.SurfaceSolid}"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center" />
+                        <TextBlock x:Name="WarningGlyph"
+                                   Text="!"
+                                   FontSize="12"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource Overlay.SurfaceSolid}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Visibility="Collapsed" />
                     </Grid>
                     <StackPanel Grid.Column="1">
                         <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="{StaticResource Overlay.Text}" TextTrimming="CharacterEllipsis" />
@@ -125,6 +134,13 @@
                 </Grid>
             </Border>
             </Button>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding Severity}" Value="Warning">
+                    <Setter TargetName="Badge" Property="Fill" Value="{StaticResource Overlay.Warning}" />
+                    <Setter TargetName="ErrorGlyph" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="WarningGlyph" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
         </DataTemplate>
 
         <DataTemplate x:Key="StatusCard">

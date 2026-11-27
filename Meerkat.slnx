@@ -6,6 +6,7 @@
     <Project Path="src/Meerkat.Widgets.Git/Meerkat.Widgets.Git.csproj" />
     <Project Path="src/Meerkat.Widgets.Notes/Meerkat.Widgets.Notes.csproj" />
     <Project Path="src/Meerkat.Widgets.Server/Meerkat.Widgets.Server.csproj" />
+    <Project Path="src/Meerkat.Widgets.Services/Meerkat.Widgets.Services.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Meerkat.Tests/Meerkat.Tests.csproj" />

@@ -28,6 +28,7 @@
     <ProjectReference Include="..\Meerkat.Widgets.Git\Meerkat.Widgets.Git.csproj" />
     <ProjectReference Include="..\Meerkat.Widgets.Notes\Meerkat.Widgets.Notes.csproj" />
     <ProjectReference Include="..\Meerkat.Widgets.Server\Meerkat.Widgets.Server.csproj" />
+    <ProjectReference Include="..\Meerkat.Widgets.Services\Meerkat.Widgets.Services.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />

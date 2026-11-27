@@ -17,7 +17,8 @@ When something breaks, the status bar says what and since when. A click on it, o
 opens a side panel with the details and the actions to deal with it.
 
 Meerkat is a generic shell that hosts **widgets**. It ships with widgets for Docker containers running
-inside WSL, for GitLab and GitHub, for servers reachable over SSH, and for notes.
+inside WSL, for GitLab and GitHub, for servers reachable over SSH, for the status of external
+services, and for notes.
 
 ## Features
 
@@ -61,6 +62,14 @@ inside WSL, for GitLab and GitHub, for servers reachable over SSH, and for notes
 - Reports unreachable hosts and nearly full disks, and refuses to connect when a host key changed
   until you have verified the new one
 - Opens a terminal session on a host with one click
+
+**Services widget**
+
+- Watches the external services your work depends on, such as GitHub, npm, Docker Hub or Maven
+  Central, by reading their status pages
+- Shows a disturbance in the status bar with the incident, its latest update and the affected
+  components, so a failing pull or push explains itself
+- Also checks any address by its HTTP status, or any JSON endpoint by a value you name
 
 **Notes widget**
 
@@ -129,7 +138,7 @@ SHA-256 checksum. Nothing is installed without your consent:
   check or the background download and switch to the pre-release channel.
 
 The update check contacts `api.github.com` and `github.com` and sends no data besides the request
-itself. Apart from it, Meerkat only uses the network for the Git and Server widgets once you have
+itself. Apart from it, Meerkat only uses the network for the Git, Server and Services widgets once you have
 configured them, and only to reach the servers you entered. Updating requires write access to the
 folder `Meerkat.exe` is in, and is only available in the published single-file builds.
 
@@ -171,6 +180,26 @@ changes, the host is blocked and the panel shows the new fingerprint for you to 
 Each check is a single SSH call that reads `/proc`, `df` and `systemctl is-active`. Nothing is
 installed or changed on the host. Per host you can list the systemd services to watch, set the check
 interval and the disk usage at which Meerkat shows a hint or an error.
+
+### Services widget
+
+Open the settings, choose *Services* and add a service, either one of the suggestions or your own
+with one of three templates:
+
+| Template | What is requested | How the state is read |
+|---|---|---|
+| Status page | `<address>/api/v2/summary.json` of a status page that offers the Statuspage API | The page's indicator, the current incident, its latest update and the components |
+| HTTP status | The address as given | A success status code (2xx) is fine; any other code or no answer is an outage |
+| Custom JSON | The address as given | A value at a path such as `status.indicator`, compared with the values you list for green and yellow; anything else is red |
+
+*Test* sends the request once and shows what Meerkat makes of the answer. Not every status page
+offers the Statuspage API, GitLab.com for one does not; use one of the other templates there.
+
+A disturbance appears as a card in the status bar. *Mute until resolved* takes it out of the status
+bar until the service is fine again. If an endpoint cannot be reached, the service keeps the state
+last learned and the page says that the check failed; only for the *HTTP status* template that means
+an outage. Each check is a single GET request, by default every five minutes, and nothing is sent
+along.
 
 ### Notes widget
 
@@ -218,6 +247,7 @@ dotnet run --project src/Meerkat.App
 | `src/Meerkat.Widgets.Docker` | The Docker widget |
 | `src/Meerkat.Widgets.Git` | The Git widget for GitLab and GitHub |
 | `src/Meerkat.Widgets.Server` | The Server widget for machines reachable over SSH |
+| `src/Meerkat.Widgets.Services` | The Services widget for the status of external services |
 | `src/Meerkat.Widgets.Notes` | The Notes widget with the scratchpad |
 | `tests/Meerkat.Tests` | Unit tests (xUnit) |
 

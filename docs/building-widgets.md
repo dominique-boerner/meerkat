@@ -149,7 +149,7 @@ The status bar is always visible, so the shell is strict about what reaches it:
 | Severity | Status bar | Panel |
 |---|---|---|
 | `Ok` | Green chip | No badge |
-| `Warning` | Yellow chip; the alert is only counted ("+2 more hints") | Yellow badge on the widget's tab |
+| `Warning` | Yellow chip; the alert is only counted ("+2 more hints"), unless it is marked `Prominent`, which gives it a yellow card | Yellow badge on the widget's tab |
 | `Error` | Red chip and a card with title, detail and age | Red badge on the widget's tab |
 
 Choose severities with that in mind:
@@ -157,6 +157,8 @@ Choose severities with that in mind:
 - Use `Error` for things that are broken and that the user would want to know about immediately, such
   as a failed pipeline or an unreachable service.
 - Use `Warning` for things worth knowing that can wait, such as a review request.
+- Mark a warning as `Prominent` only if it explains trouble the user is about to run into elsewhere,
+  such as a disturbance of a service they depend on. It then gets a card like an error does.
 - Do not raise an alert for a state the user chose, such as a container they stopped, or for a widget
   that is simply not set up yet. Return a null `Status` in the latter case.
 - Set `Since` to the moment the condition was first observed and keep it stable across refreshes; the
@@ -264,6 +266,10 @@ HTTP layer with canned responses.
 `src/Meerkat.Widgets.Server` monitors several independent targets: one polling loop per host with its
 own interval, alerts that keep the time a problem started, a list that sorts itself by severity, and
 a settings page with a list and an edit form.
+
+`src/Meerkat.Widgets.Services` polls web addresses that belong to others: one request per check with
+a floor for the interval, a failed check that is kept apart from a bad state, prominent warnings,
+and a settings form with a test request.
 
 `src/Meerkat.Widgets.Notes` works without any polling: it keeps its data in files, watches them for
 changes made elsewhere, offers global hotkeys with a window of its own, and pins a card below the

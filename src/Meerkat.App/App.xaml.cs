@@ -13,6 +13,7 @@ using Meerkat.Widgets.Docker;
 using Meerkat.Widgets.Git;
 using Meerkat.Widgets.Notes;
 using Meerkat.Widgets.Server;
+using Meerkat.Widgets.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Meerkat.App;
@@ -110,6 +111,7 @@ public partial class App : Application
         services.AddDockerWidget();
         services.AddGitWidget();
         services.AddServerWidget();
+        services.AddServicesWidget();
         services.AddNotesWidget();
 
         return services.BuildServiceProvider();

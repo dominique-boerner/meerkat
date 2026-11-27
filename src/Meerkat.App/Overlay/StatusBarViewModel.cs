@@ -8,7 +8,7 @@ namespace Meerkat.App.Overlay;
 public sealed record StatusChipViewModel(string Label, string Summary, WidgetSeverity Severity);
 
 /// <param name="WidgetId">The widget that reported the alert; its page opens when the card is clicked.</param>
-public sealed record AlertCardViewModel(string Title, string Detail, string AgeText, string? WidgetId = null);
+public sealed record AlertCardViewModel(string Title, string Detail, string AgeText, string? WidgetId = null, WidgetSeverity Severity = WidgetSeverity.Error);
 
 public sealed record StatusCardViewModel(WidgetStatusCard Card, string? WidgetId = null);
 
@@ -63,11 +63,22 @@ public sealed partial class StatusBarViewModel : ObservableObject
         Replace(Cards, reports.Where(report => report.Card is not null).Select(report => new StatusCardViewModel(report.Card!, report.WidgetId)));
 
         var alerts = reports.SelectMany(report => report.Alerts.Select(alert => (Alert: alert, report.WidgetId))).ToList();
-        var errors = alerts.Where(entry => entry.Alert.Severity == WidgetSeverity.Error).OrderBy(entry => entry.Alert.Since).ToList();
-        Replace(Alerts, errors.Take(MaxAlertCards).Select(entry => new AlertCardViewModel(entry.Alert.Title, entry.Alert.Detail, FormatAge(now - entry.Alert.Since), entry.WidgetId)));
+
+        // Errors always get a card, warnings only if their widget asks for it; errors come first.
+        var errors = alerts
+            .Where(entry => entry.Alert.Severity == WidgetSeverity.Error || entry.Alert.Prominent)
+            .OrderByDescending(entry => entry.Alert.Severity)
+            .ThenBy(entry => entry.Alert.Since)
+            .ToList();
+        Replace(Alerts, errors.Take(MaxAlertCards).Select(entry => new AlertCardViewModel(
+            entry.Alert.Title,
+            entry.Alert.Detail,
+            FormatAge(now - entry.Alert.Since),
+            entry.WidgetId,
+            entry.Alert.Severity)));
 
         var hiddenErrors = errors.Count - Alerts.Count;
-        var warnings = alerts.Count(entry => entry.Alert.Severity == WidgetSeverity.Warning);
+        var warnings = alerts.Count - errors.Count;
         MoreHintsCount = hiddenErrors + warnings > 0 ? $"+{hiddenErrors + warnings}" : null;
         MoreHintsText = (hiddenErrors, warnings) switch
         {
