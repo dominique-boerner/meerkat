@@ -1,0 +1,41 @@
+<UserControl x:Class="Meerkat.Widgets.Docker.Views.DockerSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="162" />
+            <ColumnDefinition Width="142" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Grid.Column="0" Style="{DynamicResource Overlay.FormLabel}" Text="WSL distribution" />
+        <ComboBox Grid.Row="0" Grid.Column="1" Margin="0,5"
+                  ItemsSource="{Binding Distributions}"
+                  SelectedItem="{Binding SelectedDistribution}"
+                  DisplayMemberPath="DisplayName" />
+        <TextBlock Grid.Row="0" Grid.Column="2" Style="{DynamicResource Overlay.Hint}" Margin="10,0,0,0"
+                   FontFamily="{DynamicResource Overlay.MonoFont}" Text="wsl -d &lt;name&gt;" />
+
+        <TextBlock Grid.Row="1" Grid.Column="0" Style="{DynamicResource Overlay.FormLabel}" Text="Container list interval" />
+        <TextBox Grid.Row="1" Grid.Column="1" Margin="0,5" FontFamily="{DynamicResource Overlay.MonoFont}"
+                 Text="{Binding ListIntervalSeconds}" />
+        <TextBlock Grid.Row="1" Grid.Column="2" Style="{DynamicResource Overlay.Hint}" Margin="10,0,0,0" Text="seconds" />
+
+        <TextBlock Grid.Row="2" Grid.Column="0" Style="{DynamicResource Overlay.FormLabel}" Text="Stats interval" />
+        <TextBox Grid.Row="2" Grid.Column="1" Margin="0,5" FontFamily="{DynamicResource Overlay.MonoFont}"
+                 Text="{Binding StatsIntervalSeconds}" />
+        <TextBlock Grid.Row="2" Grid.Column="2" Style="{DynamicResource Overlay.Hint}" Margin="10,0,0,0" Text="seconds" />
+
+        <TextBlock Grid.Row="3" Grid.Column="0" Style="{DynamicResource Overlay.FormLabel}" Text="Max. log lines" />
+        <TextBox Grid.Row="3" Grid.Column="1" Margin="0,5" FontFamily="{DynamicResource Overlay.MonoFont}"
+                 Text="{Binding MaxLogLines}" />
+        <TextBlock Grid.Row="3" Grid.Column="2" Style="{DynamicResource Overlay.Hint}" Margin="10,0,0,0"
+                   Text="Older lines are discarded" />
+    </Grid>
+</UserControl>

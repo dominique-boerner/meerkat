@@ -1,0 +1,34 @@
+#cloud-config
+# Provisions a WSL instance with a native Docker engine and a few demo containers for trying out Meerkat.
+
+groups:
+  - docker
+
+users:
+  - name: dev
+    gecos: Meerkat
+    shell: /bin/bash
+    groups: [sudo, docker]
+    sudo: ALL=(ALL) NOPASSWD:ALL
+
+write_files:
+  # systemd is required for the Docker service; the default user must be in the docker group
+  # because Meerkat calls the CLI without sudo.
+  - path: /etc/wsl.conf
+    content: |
+      [boot]
+      systemd=true
+
+      [user]
+      default=dev
+
+package_update: true
+packages:
+  - docker.io
+
+runcmd:
+  - systemctl enable --now docker
+  - docker run -d --name demo-web --restart unless-stopped nginx:alpine
+  - docker run -d --name demo-logger --restart unless-stopped busybox sh -c 'i=0; while true; do i=$((i+1)); echo "tick $i"; if [ $((i % 5)) -eq 0 ]; then echo "warning on tick $i" >&2; fi; sleep 1; done'
+  - docker run -d --name demo-load --restart unless-stopped --cpus 0.2 --memory 64m busybox sh -c 'while true; do :; done'
+  - docker create --name demo-stopped busybox true

@@ -1,0 +1,47 @@
+name: Release
+
+# Pushing a tag such as v1.2.0 (or v1.2.0-beta.1) builds, tests and publishes a GitHub release.
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Publish release
+    runs-on: windows-latest
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Resolve version from tag
+        shell: pwsh
+        run: |
+          $version = $env:TAG.TrimStart('v')
+          "VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Test
+        shell: pwsh
+        run: dotnet test Meerkat.slnx --configuration Release -p:Version=$env:VERSION
+
+      - name: Publish and package
+        shell: pwsh
+        run: ./build/Publish-Release.ps1 -Version $env:VERSION
+
+      - name: Create GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $arguments = @($env:TAG, '--title', "Meerkat $env:VERSION", '--generate-notes', '--verify-tag')
+          # Versions with a suffix (e.g. 1.2.0-beta.1) are published as pre-releases.
+          if ($env:VERSION.Contains('-')) { $arguments += '--prerelease' }
+          $assets = Get-ChildItem artifacts -File | ForEach-Object FullName
+          gh release create @arguments @assets
