@@ -85,7 +85,6 @@ public partial class App : Application
         services.AddSingleton(errorLog);
         services.AddSingleton(_ => new SettingsService(AppPaths.SettingsFile));
         services.AddSingleton<IWidgetSettingsStore>(provider => provider.GetRequiredService<SettingsService>());
-        services.AddSingleton<LayoutService>();
         services.AddSingleton<OverlayState>();
         services.AddSingleton<IOverlayState>(provider => provider.GetRequiredService<OverlayState>());
         services.AddSingleton<ApplicationRestart>();
@@ -94,10 +93,10 @@ public partial class App : Application
         services.AddSingleton(_ => UpdateEnvironment.ForCurrentProcess());
         services.AddSingleton<UpdateService>();
         services.AddSingleton<UpdateViewModel>();
-        services.AddSingleton(provider => new OverlayViewModel { Update = provider.GetRequiredService<UpdateViewModel>() });
+        services.AddSingleton<StatusBarViewModel>();
+        services.AddSingleton(provider => new PanelViewModel { Update = provider.GetRequiredService<UpdateViewModel>() });
         services.AddSingleton<OverlayCommands>();
         services.AddSingleton<IOverlayCommands>(provider => provider.GetRequiredService<OverlayCommands>());
-        services.AddSingleton<IOverlayPanelHost, OverlayPanelHost>();
         services.AddSingleton<HotkeyService>();
         services.AddSingleton<TrayIconService>();
         services.AddSingleton<OverlayShell>();

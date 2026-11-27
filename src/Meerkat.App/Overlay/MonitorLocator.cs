@@ -16,6 +16,21 @@ public static class MonitorLocator
         return screen.WorkingArea;
     }
 
+    /// <summary>
+    /// Bounds in physical pixels of a strip docked to the right edge of the working area.
+    /// </summary>
+    /// <param name="width">Desired width in device-independent pixels.</param>
+    public static System.Drawing.Rectangle ResolvePanelBounds(string? deviceName, double width)
+    {
+        var screens = WinForms.Screen.AllScreens;
+        var screen = screens.FirstOrDefault(candidate => candidate.DeviceName == deviceName)
+            ?? WinForms.Screen.PrimaryScreen
+            ?? screens[0];
+        var area = screen.WorkingArea;
+        var physicalWidth = Math.Min(area.Width, (int)Math.Round(width * GetScalePercent(screen) / 100.0));
+        return new System.Drawing.Rectangle(area.Right - physicalWidth, area.Top, physicalWidth, area.Height);
+    }
+
     public static IReadOnlyList<MonitorOption> GetOptions()
     {
         var options = new List<MonitorOption> { new(null, "Primary monitor") };

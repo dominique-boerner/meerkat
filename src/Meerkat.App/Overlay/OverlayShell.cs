@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Windows;
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.Input;
 using Meerkat.Abstractions;
 using Meerkat.App.Diagnostics;
@@ -14,9 +15,9 @@ namespace Meerkat.App.Overlay;
 
 public sealed class OverlayShell(
     SettingsService settings,
-    LayoutService layouts,
     OverlayState state,
-    OverlayViewModel viewModel,
+    StatusBarViewModel statusBar,
+    PanelViewModel panel,
     OverlayCommands commands,
     IEnumerable<IOverlayWidget> widgets,
     HotkeyService hotkeys,
@@ -26,34 +27,39 @@ public sealed class OverlayShell(
     ApplicationRestart applicationRestart,
     ErrorLog errorLog)
 {
-    private const int ToggleModeHotkeyId = 1;
+    private const int TogglePanelHotkeyId = 1;
     private const int ToggleVisibilityHotkeyId = 2;
     private const double MinimumOpacity = 0.2;
-    private const double DefaultWidgetOffset = 40;
+    private const double PanelWidth = 680;
 
     private static readonly TimeSpan WidgetStopTimeout = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan AgeRefreshInterval = TimeSpan.FromSeconds(30);
 
     private readonly List<HostedWidget> _hostedWidgets = [];
     private readonly CancellationTokenSource _lifetime = new();
 
-    private OverlayWindow? _window;
+    private StatusBarWindow? _statusBarWindow;
+    private PanelWindow? _panelWindow;
     private SettingsWindow? _settingsWindow;
+    private DispatcherTimer? _ageTimer;
     private string? _hotkeyWarning;
     private bool _isExiting;
 
     public async Task StartAsync()
     {
-        _window = new OverlayWindow { DataContext = viewModel };
-        _window.LayoutCommitted += (_, _) => SaveLayout();
-        _window.SizeChanged += (_, args) => viewModel.SetBounds(args.NewSize);
+        _statusBarWindow = new StatusBarWindow { DataContext = statusBar };
+        _panelWindow = new PanelWindow { DataContext = panel };
+        _panelWindow.Dismissed += (_, _) => SetPanelOpen(false);
 
+        panel.CloseRequested += (_, _) => SetPanelOpen(false);
+        panel.SettingsRequested += (_, _) => OpenSettings();
         tray.ToggleVisibilityRequested += (_, _) => ToggleVisibility();
-        tray.ToggleModeRequested += (_, _) => ToggleMode();
+        tray.TogglePanelRequested += (_, _) => TogglePanel();
         tray.SettingsRequested += (_, _) => OpenSettings();
         tray.ExitRequested += async (_, _) => await ExitAsync(restart: false);
         commands.SettingsRequested += (_, _) => OpenSettings();
         updates.RestartRequested += async (_, _) => await ExitAsync(restart: true);
-        updateViewModel.PropertyChanged += (_, _) => state.SetNotice(updateViewModel.Notice);
+        updateViewModel.PropertyChanged += (_, _) => RefreshStatus();
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
 
         foreach (var widget in widgets)
@@ -62,25 +68,29 @@ public sealed class OverlayShell(
         }
 
         ApplySettings();
-        ApplyMode(OverlayMode.Display);
-        _window.Show();
+        _statusBarWindow.Show();
 
         // Showing the window lets WPF apply its own initial placement, so the monitor bounds are enforced again.
-        _window.MoveToBounds(MonitorLocator.ResolveWorkingArea(settings.Current.Monitor));
+        _statusBarWindow.MoveToBounds(MonitorLocator.ResolveWorkingArea(settings.Current.Monitor));
         state.SetVisible(true);
+
+        // Ages such as "4 min ago" move on even when no widget reports anything new.
+        _ageTimer = new DispatcherTimer(AgeRefreshInterval, DispatcherPriority.Background, (_, _) => RefreshStatus(), _statusBarWindow.Dispatcher);
 
         _ = updates.RunAsync(_lifetime.Token);
         await SyncWidgetsAsync();
+        RefreshStatus();
     }
 
     private void RegisterWidget(IOverlayWidget widget)
     {
         try
         {
-            var offset = DefaultWidgetOffset * (_hostedWidgets.Count + 1);
-            var size = widget.DefaultSize;
-            var defaultLayout = new WidgetLayout { Left = offset, Top = offset, Width = size.Width, Height = size.Height };
-            _hostedWidgets.Add(new HostedWidget(widget, new WidgetHostViewModel(widget.Id, widget.Title, defaultLayout)));
+            var hosted = new HostedWidget(widget, new WidgetEntryViewModel(widget.Id, widget.Title, widget.Icon));
+
+            // Widgets may report from a background thread; everything the shell shows is updated on the UI thread.
+            widget.StatusChanged += (_, _) => _statusBarWindow?.Dispatcher.BeginInvoke(RefreshStatus);
+            _hostedWidgets.Add(hosted);
         }
         catch (Exception exception)
         {
@@ -94,38 +104,40 @@ public sealed class OverlayShell(
     {
         foreach (var hosted in _hostedWidgets)
         {
-            var isEnabled = !settings.Current.DisabledWidgets.Contains(hosted.Host.Id);
+            var isEnabled = !settings.Current.DisabledWidgets.Contains(hosted.Entry.Id);
             if (isEnabled && !hosted.IsActive)
             {
                 hosted.IsActive = true;
-                hosted.Host.ApplyLayout(layouts.Find(hosted.Host.Id) ?? hosted.Host.DefaultLayout);
-                viewModel.AddHost(hosted.Host);
+                panel.AddWidget(hosted.Entry);
                 await StartWidgetAsync(hosted);
             }
             else if (!isEnabled && hosted.IsActive)
             {
                 hosted.IsActive = false;
                 await StopWidgetAsync(hosted);
-                viewModel.RemoveHost(hosted.Host);
+                panel.RemoveWidget(hosted.Entry);
             }
         }
+
+        RefreshStatus();
     }
 
     private async Task StartWidgetAsync(HostedWidget hosted)
     {
         try
         {
-            hosted.Host.Failure = null;
-            hosted.Host.Content = hosted.Widget.View;
-            hosted.Host.HeaderContent = hosted.Widget.HeaderView;
+            hosted.Entry.Failure = null;
+            hosted.Entry.Content = hosted.Widget.View;
+            hosted.Entry.HeaderContent = hosted.Widget.HeaderView;
             await hosted.Widget.StartAsync(CancellationToken.None);
         }
         catch (Exception exception)
         {
-            errorLog.Write($"Widget '{hosted.Host.Id}' failed to start", exception);
-            hosted.Host.Content = null;
-            hosted.Host.HeaderContent = null;
-            hosted.Host.Failure = new WidgetFailureViewModel(
+            errorLog.Write($"Widget '{hosted.Entry.Id}' failed to start", exception);
+            hosted.FailedSince = DateTimeOffset.Now;
+            hosted.Entry.Content = null;
+            hosted.Entry.HeaderContent = null;
+            hosted.Entry.Failure = new WidgetFailureViewModel(
                 $"{exception.GetType().Name}: {exception.Message}",
                 new AsyncRelayCommand(() => RestartWidgetAsync(hosted)),
                 new RelayCommand(OpenErrorLog));
@@ -141,7 +153,7 @@ public sealed class OverlayShell(
         }
         catch (Exception exception)
         {
-            errorLog.Write($"Widget '{hosted.Host.Id}' failed to stop", exception);
+            errorLog.Write($"Widget '{hosted.Entry.Id}' failed to stop", exception);
         }
     }
 
@@ -149,6 +161,43 @@ public sealed class OverlayShell(
     {
         await StopWidgetAsync(hosted);
         await StartWidgetAsync(hosted);
+        RefreshStatus();
+    }
+
+    /// <summary>Collects what every widget reports and distributes it to the status bar and the panel.</summary>
+    private void RefreshStatus()
+    {
+        var reports = new List<WidgetReport>();
+        foreach (var hosted in _hostedWidgets.Where(hosted => hosted.IsActive))
+        {
+            var report = GetReport(hosted);
+            hosted.Entry.Badge = report.Alerts.Count == 0 ? WidgetSeverity.Ok : report.Alerts.Max(alert => alert.Severity);
+            reports.Add(report);
+        }
+
+        statusBar.Update(reports, DateTimeOffset.Now, state.PanelHotkeyText, updateViewModel.Notice);
+        panel.SetAttentionCount(reports.Sum(report => report.Alerts.Count));
+    }
+
+    private WidgetReport GetReport(HostedWidget hosted)
+    {
+        if (hosted.Entry.Failure is { } failure)
+        {
+            return new WidgetReport(
+                new WidgetStatus(hosted.Entry.Title, "–", WidgetSeverity.Error),
+                [new WidgetAlert(WidgetSeverity.Error, $"{hosted.Entry.Title} widget was suspended", failure.Detail, hosted.FailedSince)]);
+        }
+
+        try
+        {
+            return new WidgetReport(hosted.Widget.Status, hosted.Widget.Alerts);
+        }
+        catch (Exception exception)
+        {
+            // A widget that cannot even report its status must not take the status bar down with it.
+            errorLog.Write($"Widget '{hosted.Entry.Id}' failed to report its status", exception);
+            return new WidgetReport(null, []);
+        }
     }
 
     private void OpenErrorLog()
@@ -163,31 +212,44 @@ public sealed class OverlayShell(
         }
     }
 
-    private void ToggleMode() =>
-        ApplyMode(state.Mode == OverlayMode.Display ? OverlayMode.Interactive : OverlayMode.Display);
+    private void TogglePanel() => SetPanelOpen(!state.IsPanelOpen);
 
-    private void ApplyMode(OverlayMode mode)
+    private void SetPanelOpen(bool isOpen, bool animated = true)
     {
-        var isInteractive = mode == OverlayMode.Interactive;
-        _window?.SetClickThrough(!isInteractive);
-        viewModel.IsInteractive = isInteractive;
-        state.SetMode(mode);
+        if (_panelWindow is null || state.IsPanelOpen == isOpen)
+        {
+            return;
+        }
+
+        // The state is set first: hiding the window deactivates it, which would otherwise ask to close it again.
+        state.SetPanelOpen(isOpen);
+        if (isOpen)
+        {
+            _panelWindow.MoveToBounds(MonitorLocator.ResolvePanelBounds(settings.Current.Monitor, PanelWidth));
+            _panelWindow.Open();
+        }
+        else
+        {
+            _panelWindow.Dismiss(animated);
+        }
     }
 
     private void ToggleVisibility()
     {
-        if (_window is null)
+        if (_statusBarWindow is null)
         {
             return;
         }
 
         if (state.IsVisible)
         {
-            _window.Hide();
+            // Everything disappears at once; a panel still sliding out would look like a glitch.
+            SetPanelOpen(false, animated: false);
+            _statusBarWindow.Hide();
         }
         else
         {
-            _window.Show();
+            _statusBarWindow.Show();
         }
 
         state.SetVisible(!state.IsVisible);
@@ -205,10 +267,10 @@ public sealed class OverlayShell(
             settings,
             MonitorLocator.GetOptions(),
             [.. _hostedWidgets.Select(hosted => new WidgetToggleViewModel(
-                hosted.Host.Id,
-                hosted.Host.Title,
+                hosted.Entry.Id,
+                hosted.Entry.Title,
                 hosted.Widget.GetType().Namespace ?? string.Empty,
-                !settings.Current.DisabledWidgets.Contains(hosted.Host.Id)))],
+                !settings.Current.DisabledWidgets.Contains(hosted.Entry.Id)))],
             CreateSettingsSections(),
             updateViewModel,
             _hotkeyWarning,
@@ -241,12 +303,12 @@ public sealed class OverlayShell(
             {
                 if (hosted.Widget.SettingsPage is { } page)
                 {
-                    sections.Add(new WidgetSettingsSection(hosted.Host.Title, page, page.CreateView()));
+                    sections.Add(new WidgetSettingsSection(hosted.Entry.Title, page, page.CreateView()));
                 }
             }
             catch (Exception exception)
             {
-                errorLog.Write($"Widget '{hosted.Host.Id}' failed to create its settings page", exception);
+                errorLog.Write($"Widget '{hosted.Entry.Id}' failed to create its settings page", exception);
             }
         }
 
@@ -255,30 +317,21 @@ public sealed class OverlayShell(
 
     private void ApplySettings()
     {
-        if (_window is null)
+        if (_statusBarWindow is null)
         {
             return;
         }
 
         var current = settings.Current;
-        _window.Opacity = Math.Clamp(current.Opacity, MinimumOpacity, 1.0);
-        _window.MoveToBounds(MonitorLocator.ResolveWorkingArea(current.Monitor));
-
-        // The monitor or a position reset may have changed which stored layout applies.
-        foreach (var host in viewModel.Hosts)
-        {
-            host.ApplyLayout(layouts.Find(host.Id) ?? host.DefaultLayout);
-        }
-
-        viewModel.ClampAll();
+        _statusBarWindow.Opacity = Math.Clamp(current.Opacity, MinimumOpacity, 1.0);
+        ApplyBounds();
 
         var failedHotkeys = new List<string>();
-        RegisterHotkey(ToggleModeHotkeyId, current.ToggleModeHotkey, ToggleMode, failedHotkeys);
+        RegisterHotkey(TogglePanelHotkeyId, current.TogglePanelHotkey, TogglePanel, failedHotkeys);
         RegisterHotkey(ToggleVisibilityHotkeyId, current.ToggleVisibilityHotkey, ToggleVisibility, failedHotkeys);
-
-        var modeHotkeyText = HotkeyGesture.ToDisplayText(current.ToggleModeHotkey);
-        viewModel.ModeHotkeyText = modeHotkeyText;
-        state.SetHotkeyTexts(modeHotkeyText, HotkeyGesture.ToDisplayText(current.ToggleVisibilityHotkey));
+        state.SetHotkeyTexts(
+            HotkeyGesture.ToDisplayText(current.TogglePanelHotkey),
+            HotkeyGesture.ToDisplayText(current.ToggleVisibilityHotkey));
 
         _hotkeyWarning = failedHotkeys.Count > 0
             ? $"{string.Join(" and ", failedHotkeys)} could not be registered; another application may already be using it."
@@ -286,6 +339,18 @@ public sealed class OverlayShell(
         if (_hotkeyWarning is not null)
         {
             tray.ShowWarning(_hotkeyWarning);
+        }
+
+        RefreshStatus();
+    }
+
+    private void ApplyBounds()
+    {
+        var monitor = settings.Current.Monitor;
+        _statusBarWindow?.MoveToBounds(MonitorLocator.ResolveWorkingArea(monitor));
+        if (state.IsPanelOpen)
+        {
+            _panelWindow?.MoveToBounds(MonitorLocator.ResolvePanelBounds(monitor, PanelWidth));
         }
     }
 
@@ -297,21 +362,8 @@ public sealed class OverlayShell(
         }
     }
 
-    private void SaveLayout()
-    {
-        try
-        {
-            layouts.Store(viewModel.Hosts.Select(host => (host.Id, host.ToLayout())));
-        }
-        catch (Exception exception)
-        {
-            errorLog.Write("Saving the widget layout failed", exception);
-        }
-    }
-
     private void OnDisplaySettingsChanged(object? sender, EventArgs e) =>
-        _window?.Dispatcher.BeginInvoke(
-            () => _window.MoveToBounds(MonitorLocator.ResolveWorkingArea(settings.Current.Monitor)));
+        _statusBarWindow?.Dispatcher.BeginInvoke(ApplyBounds);
 
     private async Task ExitAsync(bool restart)
     {
@@ -321,6 +373,7 @@ public sealed class OverlayShell(
         }
 
         _isExiting = true;
+        _ageTimer?.Stop();
         await _lifetime.CancelAsync();
         if (restart)
         {
@@ -332,7 +385,6 @@ public sealed class OverlayShell(
         }
 
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
-        SaveLayout();
 
         foreach (var hosted in _hostedWidgets.Where(hosted => hosted.IsActive))
         {
@@ -340,16 +392,20 @@ public sealed class OverlayShell(
         }
 
         _settingsWindow?.Close();
-        _window?.Close();
+        _panelWindow?.Close();
+        _statusBarWindow?.Close();
         Application.Current.Shutdown();
     }
 
-    private sealed class HostedWidget(IOverlayWidget widget, WidgetHostViewModel host)
+    private sealed class HostedWidget(IOverlayWidget widget, WidgetEntryViewModel entry)
     {
         public IOverlayWidget Widget { get; } = widget;
 
-        public WidgetHostViewModel Host { get; } = host;
+        public WidgetEntryViewModel Entry { get; } = entry;
 
         public bool IsActive { get; set; }
+
+        /// <summary>When the widget was suspended, for the age shown with the resulting alert.</summary>
+        public DateTimeOffset FailedSince { get; set; }
     }
 }

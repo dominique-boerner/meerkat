@@ -16,17 +16,27 @@ public sealed class GitWidget(GitWidgetViewModel viewModel, GitSettingsPage sett
     private GitWidgetView? _view;
     private GitHeaderView? _headerView;
 
+    public event EventHandler? StatusChanged
+    {
+        add => viewModel.StatusChanged += value;
+        remove => viewModel.StatusChanged -= value;
+    }
+
     public string Id => WidgetId;
 
     public string Title => "Git";
+
+    public string Icon => "";
 
     public FrameworkElement View => _view ??= new GitWidgetView { DataContext = viewModel };
 
     public FrameworkElement HeaderView => _headerView ??= new GitHeaderView { DataContext = viewModel };
 
-    public Size DefaultSize => new(540, 380);
-
     public IWidgetSettingsPage SettingsPage => settingsPage;
+
+    public WidgetStatus? Status => viewModel.Status;
+
+    public IReadOnlyList<WidgetAlert> Alerts => viewModel.Alerts;
 
     public Task StartAsync(CancellationToken cancellationToken)
     {

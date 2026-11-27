@@ -123,16 +123,16 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource Overlay.FormLabel}" Text="Toggle mode" />
+                            <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource Overlay.FormLabel}" Text="Open/close panel" />
                             <TextBox Grid.Row="0" Grid.Column="1" Margin="0,5"
                                      IsReadOnly="True"
                                      FontFamily="{StaticResource Overlay.MonoFont}"
                                      ToolTip="Click the field and press the desired key combination"
-                                     Text="{Binding ToggleModeHotkey, UpdateSourceTrigger=PropertyChanged}"
+                                     Text="{Binding TogglePanelHotkey, UpdateSourceTrigger=PropertyChanged}"
                                      PreviewKeyDown="OnHotkeyBoxKeyDown" />
-                            <TextBlock Grid.Row="0" Grid.Column="2" Style="{StaticResource Overlay.Hint}" Margin="10,0,0,0" Text="Display ↔ interactive" />
+                            <TextBlock Grid.Row="0" Grid.Column="2" Style="{StaticResource Overlay.Hint}" Margin="10,0,0,0" Text="Details and actions" />
 
-                            <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource Overlay.FormLabel}" Text="Show/hide overlay" />
+                            <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource Overlay.FormLabel}" Text="Show/hide Meerkat" />
                             <TextBox Grid.Row="1" Grid.Column="1" Margin="0,5"
                                      IsReadOnly="True"
                                      FontFamily="{StaticResource Overlay.MonoFont}"
@@ -173,7 +173,7 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource Overlay.FormLabel}" Text="Opacity" />
+                            <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource Overlay.FormLabel}" Text="Status bar opacity" />
                             <Slider Grid.Row="0" Grid.Column="1" Margin="0,8"
                                     Minimum="0.2" Maximum="1" LargeChange="0.1" SmallChange="0.01"
                                     Value="{Binding Opacity}" />
@@ -186,7 +186,7 @@
                                       SelectedItem="{Binding SelectedMonitor}"
                                       DisplayMemberPath="DisplayName" />
                         </Grid>
-                        <TextBlock Style="{StaticResource Overlay.Hint}" Margin="162,2,0,0" Text="Positions are stored per monitor" />
+                        <TextBlock Style="{StaticResource Overlay.Hint}" Margin="162,2,0,0" Text="Status bar and panel appear on this monitor" />
                     </StackPanel>
 
                     <StackPanel x:Name="WidgetsSection">
@@ -196,18 +196,6 @@
                                 <DataTemplate>
                                     <Border BorderBrush="{StaticResource Overlay.Border}" BorderThickness="1" CornerRadius="4" Padding="12,8" Margin="0,0,0,6">
                                         <DockPanel>
-                                            <Button DockPanel.Dock="Right" Command="{Binding ResetPositionCommand}">
-                                                <Button.Style>
-                                                    <Style TargetType="Button" BasedOn="{StaticResource Overlay.Button}">
-                                                        <Setter Property="Content" Value="Reset position" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsResetPending}" Value="True">
-                                                                <Setter Property="Content" Value="Will be reset on save" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Button.Style>
-                                            </Button>
                                             <CheckBox IsChecked="{Binding IsEnabled}" VerticalAlignment="Center">
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />

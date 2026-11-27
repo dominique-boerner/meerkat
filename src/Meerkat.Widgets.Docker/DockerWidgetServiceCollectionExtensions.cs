@@ -21,7 +21,12 @@ public static class DockerWidgetServiceCollectionExtensions
                 provider.GetRequiredService<IProcessRunner>(),
                 () => settings.Current.Distribution);
         });
-        services.AddSingleton<DockerWidgetViewModel>();
+        services.AddSingleton(provider => new DockerWidgetViewModel(
+            provider.GetRequiredService<IContainerProvider>(),
+            provider.GetRequiredService<IOverlayState>(),
+            provider.GetRequiredService<IOverlayCommands>(),
+            provider.GetRequiredService<DockerSettingsSource>(),
+            TimeProvider.System));
         services.AddSingleton<DockerSettingsPage>();
         services.AddSingleton<IOverlayWidget, DockerWidget>();
         return services;

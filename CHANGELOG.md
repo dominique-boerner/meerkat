@@ -9,6 +9,21 @@ The section of a version becomes the text of its GitHub release and is what Meer
 
 ## [Unreleased]
 
+### Changed
+
+- New way of working with Meerkat: floating widgets are replaced by a small click-through status bar
+  with one chip per widget and a side panel with the details, opened with `Ctrl+Alt+M`.
+- The status bar shows errors as cards with their age and only counts warnings, so it stays out of
+  the way while everything works.
+- Widgets now report a status and alerts to the shell. The Docker widget warns about containers in a
+  restart loop; the Git widget reports failed pipelines and waiting reviews.
+- The log viewer of the Docker widget is part of its page in the panel again.
+
+### Removed
+
+- Display and interactive mode, moving and resizing widgets, and the layouts stored per monitor.
+  The hotkey for switching modes (`Ctrl+Alt+O`) is replaced by the hotkey for the panel.
+
 ## [1.2.0] - 2026-11-27
 
 ### Added

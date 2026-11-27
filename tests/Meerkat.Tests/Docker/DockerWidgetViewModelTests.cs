@@ -15,7 +15,7 @@ public class DockerWidgetViewModelTests
     private readonly InMemoryWidgetSettingsStore _settingsStore = new();
 
     [Fact]
-    public async Task Polling_IsSuspendedWhileOverlayIsHidden()
+    public async Task Polling_IsSuspendedWhileMeerkatIsHidden()
     {
         var viewModel = CreateViewModel();
         _provider.Containers.Add(new ContainerInfo("abc", "web", "nginx", "running", "Up"));
@@ -23,6 +23,7 @@ public class DockerWidgetViewModelTests
         viewModel.Start();
         await Task.Delay(TimeSpan.FromMilliseconds(300));
         Assert.Equal(0, _provider.ListCalls);
+        Assert.Null(viewModel.Status);
 
         _overlayState.Set(isVisible: true);
         await WaitUntilAsync(() => viewModel.Containers.Count == 1);
@@ -36,33 +37,68 @@ public class DockerWidgetViewModelTests
         var viewModel = CreateViewModel();
         _provider.Containers.Add(new ContainerInfo("bbb", "web", "nginx", "running", "Up 1 minute"));
         _provider.Containers.Add(new ContainerInfo("aaa", "db", "postgres", "exited", "Exited (0)"));
-        _provider.Containers.Add(new ContainerInfo("ccc", "queue", "rabbitmq", "restarting", "Restarting"));
         _provider.Stats.Add(new ContainerStats("bbb", "web", 1.5, 1024 * 1024, 2048L * 1024 * 1024, 0.05));
-        _overlayState.Set(isVisible: true, OverlayMode.Interactive);
+        _overlayState.Set(isVisible: true);
 
         viewModel.Start();
-        await WaitUntilAsync(() => viewModel.Containers.Count == 3 && viewModel.Containers[2].CpuText != "–");
+        await WaitUntilAsync(() => viewModel.Containers.Count == 2 && viewModel.Containers[1].CpuText != "–");
         await viewModel.StopAsync();
 
-        Assert.True(viewModel.IsInteractive);
-        Assert.Equal("Ctrl+Alt+O", viewModel.ModeHotkeyText);
-        Assert.Equal("1 of 3 running", viewModel.Summary);
-        Assert.Equal("List every 5 s · Stats every 3 s", viewModel.IntervalText);
-        Assert.Equal(["db", "queue", "web"], viewModel.Containers.Select(row => row.Name));
-        Assert.Equal(["stopped", "restarting", "running"], viewModel.Containers.Select(row => row.StatusText));
+        Assert.Equal("1 of 2 running", viewModel.Summary);
+        Assert.Equal(["db", "web"], viewModel.Containers.Select(row => row.Name));
+        Assert.Equal(["stopped", "running"], viewModel.Containers.Select(row => row.StatusText));
         Assert.Equal("–", viewModel.Containers[0].MemoryText);
-        Assert.Equal(1.5, viewModel.Containers[2].CpuPercent);
-        Assert.Equal("1.0 MiB", viewModel.Containers[2].MemoryText.Replace(',', '.'));
+        Assert.Equal(1.5, viewModel.Containers[1].CpuPercent);
+        Assert.Equal("1.0 MiB", viewModel.Containers[1].MemoryText.Replace(',', '.'));
     }
 
     [Fact]
-    public async Task ListFailure_IsShownAsFailureCardAndClearedOnRecovery()
+    public async Task Status_IsCalmWhileContainersRunOrAreSimplyStopped()
+    {
+        var viewModel = CreateViewModel();
+        _provider.Containers.Add(new ContainerInfo("bbb", "web", "nginx", "running", "Up 1 minute"));
+        _provider.Containers.Add(new ContainerInfo("aaa", "db", "postgres", "exited", "Exited (0)"));
+        var notifications = 0;
+        viewModel.StatusChanged += (_, _) => notifications++;
+
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        Assert.Equal(new WidgetStatus("Docker", "1/2", WidgetSeverity.Ok), viewModel.Status);
+        Assert.Empty(viewModel.Alerts);
+        Assert.Empty(viewModel.RestartingContainers);
+        Assert.Equal(1, notifications);
+    }
+
+    [Fact]
+    public async Task Status_WarnsAboutContainersInARestartLoop()
+    {
+        var viewModel = CreateViewModel();
+        _provider.Containers.Add(new ContainerInfo("bbb", "web", "nginx", "running", "Up 1 minute"));
+        _provider.Containers.Add(new ContainerInfo("ccc", "queue", "rabbitmq", "restarting", "Restarting (1) 5 seconds ago"));
+
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        var firstSeen = Assert.Single(viewModel.Alerts).Since;
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        Assert.Equal(new WidgetStatus("Docker", "1/2", WidgetSeverity.Warning), viewModel.Status);
+        var alert = Assert.Single(viewModel.Alerts);
+        Assert.Equal(WidgetSeverity.Warning, alert.Severity);
+        Assert.Equal("queue keeps restarting", alert.Title);
+        Assert.Equal("Restarting (1) 5 seconds ago", alert.Detail);
+        Assert.Equal(firstSeen, alert.Since);
+        Assert.Equal("queue", Assert.Single(viewModel.RestartingContainers).Name);
+    }
+
+    [Fact]
+    public async Task ListFailure_IsShownAsFailureCardAndReportedAsError()
     {
         _settingsStore.Save(Widgets.Docker.DockerWidget.WidgetId, new DockerWidgetSettings { Distribution = "Ubuntu-24.04" });
         var viewModel = CreateViewModel();
+        _provider.Containers.Add(new ContainerInfo("abc", "web", "nginx", "running", "Up"));
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
         _provider.ListFailure = new ContainerProviderException(
             ContainerFailureKind.WslUnavailable, "wsl -d Ubuntu-24.04 docker ps -a", -1, "WSL_E_DISTRO_NOT_FOUND");
-
         await viewModel.RefreshCommand.ExecuteAsync(null);
 
         Assert.NotNull(viewModel.Failure);
@@ -72,11 +108,19 @@ public class DockerWidgetViewModelTests
         Assert.True(viewModel.Failure.CanChooseDistribution);
         Assert.Null(viewModel.ErrorMessage);
 
+        // Nothing is known to be running while Docker cannot be asked.
+        Assert.Equal(new WidgetStatus("Docker", "0/1", WidgetSeverity.Error), viewModel.Status);
+        var alert = Assert.Single(viewModel.Alerts);
+        Assert.Equal(WidgetSeverity.Error, alert.Severity);
+        Assert.Equal("WSL not reachable", alert.Title);
+        Assert.EndsWith("· Ubuntu-24.04", alert.Detail);
+
         _provider.ListFailure = null;
         await viewModel.RefreshCommand.ExecuteAsync(null);
 
         Assert.Null(viewModel.Failure);
-        Assert.True(viewModel.IsEmpty);
+        Assert.Equal(WidgetSeverity.Ok, viewModel.Status?.Severity);
+        Assert.Empty(viewModel.Alerts);
     }
 
     [Fact]
@@ -92,7 +136,7 @@ public class DockerWidgetViewModelTests
     }
 
     [Fact]
-    public void ShowLogs_OpensPanelForTheSelectedContainerOnly()
+    public void ShowLogs_OpensTheLogViewerForTheSelectedContainerOnly()
     {
         var viewModel = CreateViewModel();
         var first = new ContainerRowViewModel(new ContainerInfo("abc", "web", "nginx", "running", "Up"));
@@ -123,7 +167,7 @@ public class DockerWidgetViewModelTests
     }
 
     private DockerWidgetViewModel CreateViewModel() =>
-        new(_provider, _overlayState, _overlayCommands, new DockerSettingsSource(_settingsStore));
+        new(_provider, _overlayState, _overlayCommands, new DockerSettingsSource(_settingsStore), TimeProvider.System);
 
     private static async Task WaitUntilAsync(Func<bool> condition)
     {

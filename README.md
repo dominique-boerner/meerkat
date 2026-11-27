@@ -8,34 +8,38 @@
 [![Latest release](https://img.shields.io/github/v/release/dominique-boerner/meerkat)](https://github.com/dominique-boerner/meerkat/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Meerkat is a desktop overlay for developers on Windows. It stays on top of your work without getting
-in the way: in display mode every click passes straight through to the application underneath, and a
-global hotkey turns the overlay interactive when you want to act on what you see.
+Meerkat keeps an eye on your development environment so you do not have to. A small status bar in the
+corner of the screen shows whether your containers and pipelines are fine. It stays out of the way:
+every click passes straight through it, and as long as everything works it is one quiet line.
 
-The overlay is a generic shell that hosts **widgets**. The first widget watches the Docker containers
-running inside WSL.
+When something breaks, the status bar says what and since when. A global hotkey opens a side panel
+with the details and the actions to deal with it.
+
+Meerkat is a generic shell that hosts **widgets**. It ships with one for Docker containers running
+inside WSL and one for GitLab and GitHub.
 
 ## Features
 
-**Overlay shell**
+**Shell**
 
-- Borderless, transparent, always-on-top window that never takes focus from the application you work in
-- Two modes, toggled with a global hotkey
-  - *Display*: clicks pass through the overlay
-  - *Interactive*: widgets can be operated, moved and resized
-- A second hotkey shows and hides the whole overlay
-- Tray icon with quick access to both modes, the settings and exit
-- Per-monitor DPI aware; widget positions and sizes are stored per monitor
+- *Status bar*: one chip per widget, always on top, click-through, never takes focus
+- Errors appear as cards below the status bar with their age; warnings are only counted, so the bar
+  stays small
+- *Panel*: a side panel, opened with a global hotkey, with one page per widget, badges for widgets
+  that need attention, and a pin to keep it open
+- A second hotkey hides and shows Meerkat entirely; hidden widgets stop polling
+- Tray icon with quick access to the panel, the settings and exit
+- Per-monitor DPI aware; choose the monitor the status bar and the panel appear on
 - A failing widget is suspended and can be restarted without affecting the shell or other widgets
 - Updates itself from GitHub releases, with checksum verification and installation on request
 
 **Docker widget**
 
 - Lists all containers of a WSL distribution with status, CPU and memory usage
-- Start, stop and restart containers in interactive mode
+- Start, stop and restart containers from the panel
 - Live log viewer with text filter, stdout/stderr toggles, pause, and a bounded line buffer
-- Polling pauses while the overlay is hidden
-- Dedicated error states when WSL, the Docker daemon or the Docker CLI is unavailable
+- Warns about containers stuck in a restart loop and reports an unreachable WSL distribution or
+  Docker daemon as an error
 
 **Git widget**
 
@@ -44,6 +48,7 @@ running inside WSL.
 - Explains failed runs with their stages, a link to the job log and a retry button
 - Lists merge or pull requests waiting for your review and the ones you opened
 - One layout for both providers; only the vocabulary changes
+- Reports failed pipelines as an error and waiting reviews as a hint
 - Keeps the last data visible when the token expires or a rate limit is hit, and says so
 
 ## Requirements
@@ -62,22 +67,22 @@ running inside WSL.
    - `Meerkat-<version>-win-x64-self-contained.zip` bundles the runtime
 2. Extract it anywhere and run `Meerkat.exe`.
 
-Meerkat starts in display mode and adds an icon to the notification area.
+Meerkat shows its status bar in the top right corner and adds an icon to the notification area.
 
 ## Usage
 
 | Action | Default hotkey |
 |---|---|
-| Toggle between display and interactive mode | `Ctrl+Alt+O` |
-| Show or hide the overlay | `Ctrl+Alt+H` |
+| Open or close the panel | `Ctrl+Alt+M` |
+| Hide or show Meerkat | `Ctrl+Alt+H` |
 
-In interactive mode, drag a widget by its header to move it and use the grip in its bottom-right
-corner to resize it. The same actions are available from the tray icon.
+The panel closes when you press `Esc`, press the hotkey again or switch to another window. Pin it to
+keep it open next to your work. Both actions are also available from the tray icon.
 
 ### Configuration
 
-Open the settings from the tray icon or the gear button of a widget. You can change the hotkeys,
-the overlay opacity, the monitor the overlay is shown on, which widgets are enabled, and the
+Open the settings from the tray icon or the gear button in the panel. You can change the hotkeys,
+the opacity of the status bar, the monitor Meerkat appears on, which widgets are enabled, and the
 settings each widget contributes.
 
 Everything is stored as JSON in `%AppData%\Meerkat\settings.json`. Errors are logged to
@@ -89,8 +94,8 @@ Meerkat keeps itself up to date. At startup and once a day it asks the GitHub AP
 this repository, downloads a newer version in the background and verifies it against the published
 SHA-256 checksum. Nothing is installed without your consent:
 
-- In display mode a hint in the widget footer and a dot on the tray icon show that an update is ready.
-- In interactive mode a card offers to restart and install now, or to install when Meerkat exits.
+- A hint below the status bar and a dot on the tray icon show that an update is ready.
+- A card in the panel offers to restart and install now, or to install when Meerkat exits.
 - The *Updates* page of the settings shows the release notes and lets you turn off the automatic
   check or the background download and switch to the pre-release channel.
 
@@ -137,7 +142,7 @@ dotnet run --project src/Meerkat.App
 
 | Project | Purpose |
 |---|---|
-| `src/Meerkat.App` | The overlay shell: window, hotkeys, tray icon, settings, widget hosting |
+| `src/Meerkat.App` | The shell: status bar, panel, hotkeys, tray icon, settings, updates, widget hosting |
 | `src/Meerkat.Abstractions` | Contracts and shared visual theme for widgets |
 | `src/Meerkat.Widgets.Docker` | The Docker widget |
 | `src/Meerkat.Widgets.Git` | The Git widget for GitLab and GitHub |

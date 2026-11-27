@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Meerkat.Abstractions;
@@ -25,13 +24,6 @@ public sealed partial class GitWidgetViewModel : ObservableObject
     private DateTimeOffset? _lastRefreshed;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsDisplayMode))]
-    [NotifyPropertyChangedFor(nameof(ShowPipelines))]
-    [NotifyPropertyChangedFor(nameof(ShowReviewRequests))]
-    [NotifyPropertyChangedFor(nameof(ShowMyChangeRequests))]
-    private bool _isInteractive;
-
-    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsStale))]
     private GitFailureViewModel? _failure;
 
@@ -51,18 +43,11 @@ public sealed partial class GitWidgetViewModel : ObservableObject
     private string _ageText = string.Empty;
 
     [ObservableProperty]
-    private string _intervalText = string.Empty;
-
-    /// <summary>Footer hint in display mode, e.g. "2 reviews waiting for you"; null without open reviews.</summary>
-    [ObservableProperty]
-    private string? _reviewNotice;
-
-    /// <summary>Message from the shell, e.g. a pending update.</summary>
-    [ObservableProperty]
-    private string? _shellNotice;
-
-    [ObservableProperty]
     private string? _actionError;
+
+    // When each problem was first seen, so that alerts can show how long it has lasted.
+    private DateTimeOffset? _failingSince;
+    private DateTimeOffset? _reviewsWaitingSince;
 
     public GitWidgetViewModel(
         IGitProviderFactory providerFactory,
@@ -89,17 +74,22 @@ public sealed partial class GitWidgetViewModel : ObservableObject
 
     public IReadOnlyList<GitTabViewModel> Tabs { get; }
 
-    public bool IsDisplayMode => !IsInteractive;
+    /// <summary>Raised when <see cref="Status"/> or <see cref="Alerts"/> changed.</summary>
+    public event EventHandler? StatusChanged;
 
     /// <summary>True while a failure hides whether the shown data is still current.</summary>
     public bool IsStale => Failure is not null;
 
-    // Display mode has no tabs to switch with, so it always shows the pipelines.
-    public bool ShowPipelines => IsDisplayMode || SelectedTab == GitTab.Pipelines;
+    public bool ShowPipelines => SelectedTab == GitTab.Pipelines;
 
-    public bool ShowReviewRequests => IsInteractive && SelectedTab == GitTab.ReviewRequests;
+    public bool ShowReviewRequests => SelectedTab == GitTab.ReviewRequests;
 
-    public bool ShowMyChangeRequests => IsInteractive && SelectedTab == GitTab.MyChangeRequests;
+    public bool ShowMyChangeRequests => SelectedTab == GitTab.MyChangeRequests;
+
+    /// <summary>The widget's entry in the status bar; null while no provider is connected.</summary>
+    public WidgetStatus? Status { get; private set; }
+
+    public IReadOnlyList<WidgetAlert> Alerts { get; private set; } = [];
 
     public void Start()
     {
@@ -111,9 +101,7 @@ public sealed partial class GitWidgetViewModel : ObservableObject
         _cancellation = new CancellationTokenSource();
         var cancellationToken = _cancellation.Token;
 
-        _overlayState.Changed += OnOverlayStateChanged;
         _settingsSource.Changed += OnSettingsChanged;
-        OnOverlayStateChanged(this, EventArgs.Empty);
         RebuildProvider();
 
         _loops = Task.WhenAll(RunPollingLoopAsync(cancellationToken), RunClockLoopAsync(cancellationToken));
@@ -126,7 +114,6 @@ public sealed partial class GitWidgetViewModel : ObservableObject
             return;
         }
 
-        _overlayState.Changed -= OnOverlayStateChanged;
         _settingsSource.Changed -= OnSettingsChanged;
         await _cancellation.CancelAsync();
         await _loops;
@@ -143,6 +130,7 @@ public sealed partial class GitWidgetViewModel : ObservableObject
         {
             // Creating the provider may have failed with a message of its own, e.g. for an invalid server URL.
             Failure ??= GitFailureViewModel.NotConfigured(Terminology);
+            UpdateStatus();
             return null;
         }
 
@@ -178,6 +166,7 @@ public sealed partial class GitWidgetViewModel : ObservableObject
         catch (Exception exception)
         {
             Failure = GitFailureViewModel.From(exception, Terminology, _lastRefreshed);
+            UpdateStatus();
             return (exception as GitProviderException)?.RetryAt;
         }
     }
@@ -328,12 +317,12 @@ public sealed partial class GitWidgetViewModel : ObservableObject
         {
             Failure = GitFailureViewModel.From(exception, Terminology, lastRefreshed: null);
         }
+
+        UpdateStatus();
     }
 
     private void ApplySettingsTexts()
     {
-        var settings = _settingsSource.Current;
-        IntervalText = $"every {settings.Interval.TotalSeconds.ToString("0", CultureInfo.CurrentCulture)} s";
         Tabs[0].Label = Terminology.PipelinesTitle;
         Tabs[1].Label = "Reviews for me";
         Tabs[2].Label = $"My {Terminology.ChangeRequestsAbbreviation}";
@@ -347,13 +336,67 @@ public sealed partial class GitWidgetViewModel : ObservableObject
         Tabs[1].Count = ReviewRequests.Count;
         Tabs[1].NeedsAttention = ReviewRequests.Count > 0;
         Tabs[2].Count = MyChangeRequests.Count;
-        ReviewNotice = ReviewRequests.Count switch
-        {
-            0 => null,
-            1 => "1 review waiting for you",
-            var count => $"{count} reviews waiting for you",
-        };
         UpdateTimes();
+        UpdateStatus();
+    }
+
+    /// <summary>Derives what the shell shows about this widget from the loaded data and the current failure.</summary>
+    private void UpdateStatus()
+    {
+        var now = _timeProvider.GetLocalNow();
+        var alerts = new List<WidgetAlert>();
+
+        if (Failure is { AlertSeverity: { } severity } failure)
+        {
+            _failingSince ??= now;
+            Status = new WidgetStatus(Terminology.PipelinesTitle, "–", severity);
+            alerts.Add(new WidgetAlert(severity, failure.Title, failure.Message, _failingSince.Value));
+        }
+        else if (Failure is not null)
+        {
+            // Not connected yet: nothing to report, and nothing the user needs to be nagged about.
+            _failingSince = null;
+            Status = null;
+        }
+        else
+        {
+            _failingSince = null;
+            var failed = Pipelines.Where(row => row.IsFailed).ToList();
+            Status = new WidgetStatus(
+                Terminology.PipelinesTitle,
+                $"{Pipelines.Count - failed.Count}/{Pipelines.Count}",
+                failed.Count > 0 ? WidgetSeverity.Error : WidgetSeverity.Ok);
+
+            if (failed.Count > 0)
+            {
+                var noun = failed.Count == 1 ? Terminology.PipelineSingular : Terminology.PipelinesTitle;
+                var byProject = failed
+                    .GroupBy(row => row.ProjectName)
+                    .Select(group => failed.Count == 1 ? $"{group.Key} · {group.First().RefText}" : $"{group.Key} ({group.Count()})");
+                alerts.Add(new WidgetAlert(
+                    WidgetSeverity.Error,
+                    $"{failed.Count} {noun.ToLowerInvariant()} failed",
+                    string.Join(" · ", byProject),
+                    failed.Min(row => row.Run.UpdatedAt)));
+            }
+        }
+
+        if (Failure is null && ReviewRequests.Count > 0)
+        {
+            _reviewsWaitingSince ??= now;
+            alerts.Add(new WidgetAlert(
+                WidgetSeverity.Warning,
+                ReviewRequests.Count == 1 ? "1 review waiting for you" : $"{ReviewRequests.Count} reviews waiting for you",
+                string.Join(" · ", ReviewRequests.Select(request => request.Reference)),
+                _reviewsWaitingSince.Value));
+        }
+        else if (Failure is null)
+        {
+            _reviewsWaitingSince = null;
+        }
+
+        Alerts = alerts;
+        StatusChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void UpdateTimes()
@@ -380,12 +423,6 @@ public sealed partial class GitWidgetViewModel : ObservableObject
         _lastRefreshed = null;
         RebuildProvider();
         _wake.TrySetResult();
-    }
-
-    private void OnOverlayStateChanged(object? sender, EventArgs e)
-    {
-        IsInteractive = _overlayState.Mode == OverlayMode.Interactive;
-        ShellNotice = _overlayState.Notice;
     }
 
     private static void Replace<T>(ObservableCollection<T> collection, IEnumerable<T> items)

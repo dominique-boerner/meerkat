@@ -39,18 +39,16 @@ internal sealed class FakeOverlayState : IOverlayState
 {
     public bool IsVisible { get; private set; }
 
-    public OverlayMode Mode { get; private set; } = OverlayMode.Display;
+    public bool IsPanelOpen { get; private set; }
 
-    public string ModeHotkeyText => "Ctrl+Alt+O";
-
-    public string? Notice { get; set; }
+    public string PanelHotkeyText => "Ctrl+Alt+M";
 
     public event EventHandler? Changed;
 
-    public void Set(bool isVisible, OverlayMode mode = OverlayMode.Display)
+    public void Set(bool isVisible, bool isPanelOpen = false)
     {
         IsVisible = isVisible;
-        Mode = mode;
+        IsPanelOpen = isPanelOpen;
         Changed?.Invoke(this, EventArgs.Empty);
     }
 }

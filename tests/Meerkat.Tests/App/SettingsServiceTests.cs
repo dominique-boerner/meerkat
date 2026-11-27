@@ -27,10 +27,9 @@ public sealed class SettingsServiceTests : IDisposable
     {
         var settings = new SettingsService(FilePath).Current;
 
-        Assert.Equal("Ctrl+Alt+O", settings.ToggleModeHotkey);
+        Assert.Equal("Ctrl+Alt+M", settings.TogglePanelHotkey);
         Assert.Equal("Ctrl+Alt+H", settings.ToggleVisibilityHotkey);
         Assert.Null(settings.Monitor);
-        Assert.Empty(settings.Layouts);
         Assert.Empty(settings.DisabledWidgets);
     }
 
@@ -54,18 +53,17 @@ public sealed class SettingsServiceTests : IDisposable
     }
 
     [Fact]
-    public void Layouts_AreKeptSeparatelyPerMonitor()
+    public void FileFromAnOlderVersion_IsReadWithoutItsObsoleteEntries()
     {
-        var service = new SettingsService(FilePath);
-        var layouts = new LayoutService(service);
+        Directory.CreateDirectory(_directory);
+        File.WriteAllText(FilePath, """
+            { "ToggleModeHotkey": "Ctrl+Alt+O", "Opacity": 0.6, "Layouts": { "primary": { "docker": { "Left": 1, "Top": 2, "Width": 3, "Height": 4 } } } }
+            """);
 
-        layouts.Store([("docker", new WidgetLayout { Left = 10, Top = 20, Width = 300, Height = 200 })]);
-        service.Current.Monitor = @"\\.\DISPLAY2";
-        Assert.Null(layouts.Find("docker"));
-        layouts.Store([("docker", new WidgetLayout { Left = 500, Top = 20, Width = 300, Height = 200 })]);
+        var settings = new SettingsService(FilePath).Current;
 
-        var reloaded = new LayoutService(new SettingsService(FilePath));
-        Assert.Equal(500, reloaded.Find("docker")?.Left);
+        Assert.Equal(0.6, settings.Opacity);
+        Assert.Equal("Ctrl+Alt+M", settings.TogglePanelHotkey);
     }
 
     [Fact]
@@ -91,44 +89,36 @@ public sealed class SettingsServiceTests : IDisposable
     }
 
     [Fact]
-    public void SettingsViewModel_SavesHotkeysWidgetStateAndPositionResets()
+    public void SettingsViewModel_SavesHotkeysWidgetStateAndUpdatePreferences()
     {
         var service = new SettingsService(FilePath);
-        new LayoutService(service).Store(
-        [
-            ("docker", new WidgetLayout { Left = 10, Top = 20, Width = 300, Height = 200 }),
-            ("docker.logs", new WidgetLayout { Left = 10, Top = 300, Width = 600, Height = 200 }),
-            ("other", new WidgetLayout { Left = 1, Top = 1, Width = 300, Height = 200 }),
-        ]);
         var docker = new WidgetToggleViewModel("docker", "Docker", "Meerkat.Widgets.Docker", isEnabled: true);
         var viewModel = CreateViewModel(service, docker);
 
-        viewModel.ToggleModeHotkey = "Ctrl+Shift+F9";
+        viewModel.TogglePanelHotkey = "Ctrl+Shift+F9";
         viewModel.CheckForUpdatesAutomatically = false;
         viewModel.SelectedChannel = viewModel.Channels.Single(option => option.Channel == UpdateChannel.Prerelease);
         docker.IsEnabled = false;
-        docker.ResetPositionCommand.Execute(null);
         var saved = viewModel.TrySave();
 
         Assert.True(saved);
         var reloaded = new SettingsService(FilePath);
-        Assert.Equal("Ctrl+Shift+F9", reloaded.Current.ToggleModeHotkey);
+        Assert.Equal("Ctrl+Shift+F9", reloaded.Current.TogglePanelHotkey);
         Assert.Equal(["docker"], reloaded.Current.DisabledWidgets);
         Assert.False(reloaded.Current.Updates.CheckAutomatically);
         Assert.True(reloaded.Current.Updates.DownloadInBackground);
         Assert.Equal(UpdateChannel.Prerelease, reloaded.Current.Updates.Channel);
         Assert.Equal(["Hotkeys", "Appearance", "Widgets", "Updates"], viewModel.NavigationItems.Select(item => item.Title));
-        Assert.Equal(["other"], reloaded.Current.Layouts["primary"].Keys);
     }
 
     [Theory]
-    [InlineData("O", "Ctrl+Alt+H")]
+    [InlineData("M", "Ctrl+Alt+H")]
     [InlineData("Ctrl+Alt+H", "Ctrl+Alt+H")]
-    public void SettingsViewModel_RejectsInvalidOrConflictingHotkeys(string toggleMode, string toggleVisibility)
+    public void SettingsViewModel_RejectsInvalidOrConflictingHotkeys(string togglePanel, string toggleVisibility)
     {
         var service = new SettingsService(FilePath);
         var viewModel = CreateViewModel(service);
-        viewModel.ToggleModeHotkey = toggleMode;
+        viewModel.TogglePanelHotkey = togglePanel;
         viewModel.ToggleVisibilityHotkey = toggleVisibility;
 
         Assert.False(viewModel.TrySave());

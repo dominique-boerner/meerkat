@@ -33,6 +33,10 @@ public class GitWidgetViewModelTests
         Assert.Equal("Connect GitLab", viewModel.Failure.Title);
         Assert.True(viewModel.Failure.CanOpenSettings);
         Assert.False(viewModel.Failure.CanRenewToken);
+
+        // Not being set up yet is no problem worth reporting.
+        Assert.Null(viewModel.Status);
+        Assert.Empty(viewModel.Alerts);
     }
 
     [Fact]
@@ -70,9 +74,16 @@ public class GitWidgetViewModelTests
         Assert.Equal(["Pipelines", "Reviews for me", "My MRs"], viewModel.Tabs.Select(tab => tab.Label));
         Assert.Equal([4, 2, 0], viewModel.Tabs.Select(tab => tab.Count));
         Assert.True(viewModel.Tabs[1].NeedsAttention);
-        Assert.Equal("2 reviews waiting for you", viewModel.ReviewNotice);
         Assert.Equal("GitLab · 1 project", viewModel.ProviderSummary);
-        Assert.Equal("every 60 s", viewModel.IntervalText);
+
+        Assert.Equal(new WidgetStatus("Pipelines", "3/4", WidgetSeverity.Error), viewModel.Status);
+        Assert.Equal(2, viewModel.Alerts.Count);
+        Assert.Equal(WidgetSeverity.Error, viewModel.Alerts[0].Severity);
+        Assert.Equal("1 pipeline failed", viewModel.Alerts[0].Title);
+        Assert.Equal("shop-core · feature/import", viewModel.Alerts[0].Detail);
+        Assert.Equal(WidgetSeverity.Warning, viewModel.Alerts[1].Severity);
+        Assert.Equal("2 reviews waiting for you", viewModel.Alerts[1].Title);
+        Assert.Equal("!12 · !13", viewModel.Alerts[1].Detail);
     }
 
     [Fact]
@@ -115,6 +126,8 @@ public class GitWidgetViewModelTests
         Assert.True(viewModel.IsStale);
         Assert.Single(viewModel.Pipelines);
         Assert.Equal([GitLab.TokenPageUrl], _overlayCommands.OpenedUrls);
+        Assert.Equal(new WidgetStatus("Pipelines", "–", WidgetSeverity.Error), viewModel.Status);
+        Assert.Equal("Access token expired or invalid", Assert.Single(viewModel.Alerts).Title);
     }
 
     [Fact]
@@ -132,6 +145,10 @@ public class GitWidgetViewModelTests
         Assert.Equal("GitLab: rate limit reached", viewModel.Failure?.Title);
         Assert.Contains($"Next refresh at {retryAt:HH:mm}", viewModel.Failure?.Message);
         Assert.False(viewModel.Failure?.CanOpenSettings);
+
+        // A rate limit resolves itself, so it is a hint and not an alarm.
+        Assert.Equal(WidgetSeverity.Warning, viewModel.Status?.Severity);
+        Assert.Equal(WidgetSeverity.Warning, Assert.Single(viewModel.Alerts).Severity);
     }
 
     [Fact]
@@ -139,7 +156,6 @@ public class GitWidgetViewModelTests
     {
         GitLab.Runs.Add(Run("11", "main", PipelineStatus.Failed, DateTimeOffset.Now));
         var viewModel = CreateViewModel(new GitWidgetSettings { Projects = [Core] }, token: "secret");
-        _overlayState.Set(isVisible: false, OverlayMode.Interactive);
         viewModel.Start();
         await viewModel.RefreshAsync(CancellationToken.None);
 
@@ -155,17 +171,6 @@ public class GitWidgetViewModelTests
         Assert.True(viewModel.ShowMyChangeRequests);
         Assert.False(viewModel.ShowPipelines);
         Assert.True(GitLab.IsDisposed);
-    }
-
-    [Fact]
-    public void DisplayMode_AlwaysShowsPipelines()
-    {
-        var viewModel = CreateViewModel(new GitWidgetSettings(), token: "secret");
-
-        viewModel.SelectTabCommand.Execute(viewModel.Tabs[1]);
-
-        Assert.True(viewModel.ShowPipelines);
-        Assert.False(viewModel.ShowReviewRequests);
     }
 
     [Fact]

@@ -48,7 +48,7 @@
                     Command="{Binding ClearCommand}" />
             <Button Style="{DynamicResource Overlay.IconButton}"
                     Content="&#xE8BB;"
-                    ToolTip="Close"
+                    ToolTip="Close logs"
                     Command="{Binding CloseCommand}" />
         </StackPanel>
 

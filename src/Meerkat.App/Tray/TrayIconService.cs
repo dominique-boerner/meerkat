@@ -27,7 +27,7 @@ public sealed class TrayIconService : IDisposable
     private readonly WinForms.NotifyIcon _notifyIcon;
     private readonly WinForms.ContextMenuStrip _menu;
     private readonly WinForms.ToolStripMenuItem _visibilityItem;
-    private readonly WinForms.ToolStripMenuItem _modeItem;
+    private readonly WinForms.ToolStripMenuItem _panelItem;
 
     private readonly UpdateViewModel _update;
     private readonly WinForms.ToolStripMenuItem _updateItem;
@@ -51,7 +51,7 @@ public sealed class TrayIconService : IDisposable
         _updateItem.Font = new Drawing.Font(_updateItem.Font, Drawing.FontStyle.Bold);
 
         _visibilityItem = CreateItem(() => ToggleVisibilityRequested?.Invoke(this, EventArgs.Empty));
-        _modeItem = CreateItem(() => ToggleModeRequested?.Invoke(this, EventArgs.Empty));
+        _panelItem = CreateItem(() => TogglePanelRequested?.Invoke(this, EventArgs.Empty));
         var settingsItem = CreateItem(() => SettingsRequested?.Invoke(this, EventArgs.Empty));
         settingsItem.Text = "Settings …";
         var exitItem = CreateItem(() => ExitRequested?.Invoke(this, EventArgs.Empty));
@@ -69,7 +69,7 @@ public sealed class TrayIconService : IDisposable
             ForeColor = TextMuted,
             Font = new Drawing.Font(_menu.Font.FontFamily, 7.5f, Drawing.FontStyle.Bold),
         });
-        _menu.Items.AddRange([_updateItem, _updateSeparator, _visibilityItem, _modeItem, new WinForms.ToolStripSeparator(), settingsItem, new WinForms.ToolStripSeparator(), exitItem]);
+        _menu.Items.AddRange([_updateItem, _updateSeparator, _panelItem, _visibilityItem, new WinForms.ToolStripSeparator(), settingsItem, new WinForms.ToolStripSeparator(), exitItem]);
 
         _notifyIcon = new WinForms.NotifyIcon
         {
@@ -78,7 +78,7 @@ public sealed class TrayIconService : IDisposable
             ContextMenuStrip = _menu,
             Visible = true,
         };
-        _notifyIcon.DoubleClick += (_, _) => ToggleVisibilityRequested?.Invoke(this, EventArgs.Empty);
+        _notifyIcon.DoubleClick += (_, _) => TogglePanelRequested?.Invoke(this, EventArgs.Empty);
 
         SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
         _state.Changed += OnStateChanged;
@@ -89,7 +89,7 @@ public sealed class TrayIconService : IDisposable
 
     public event EventHandler? ToggleVisibilityRequested;
 
-    public event EventHandler? ToggleModeRequested;
+    public event EventHandler? TogglePanelRequested;
 
     public event EventHandler? SettingsRequested;
 
@@ -184,10 +184,11 @@ public sealed class TrayIconService : IDisposable
 
     private void OnStateChanged(object? sender, EventArgs e)
     {
-        _visibilityItem.Text = _state.IsVisible ? "Hide overlay" : "Show overlay";
+        _visibilityItem.Text = _state.IsVisible ? "Hide Meerkat" : "Show Meerkat";
         _visibilityItem.ShortcutKeyDisplayString = _state.VisibilityHotkeyText;
-        _modeItem.Text = _state.Mode == OverlayMode.Interactive ? "Display mode" : "Interactive mode";
-        _modeItem.ShortcutKeyDisplayString = _state.ModeHotkeyText;
+        _panelItem.Text = _state.IsPanelOpen ? "Close panel" : "Open panel";
+        _panelItem.ShortcutKeyDisplayString = _state.PanelHotkeyText;
+        _panelItem.Enabled = _state.IsVisible;
     }
 
     private sealed class DarkColorTable : WinForms.ProfessionalColorTable

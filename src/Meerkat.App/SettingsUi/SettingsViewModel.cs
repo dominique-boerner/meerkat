@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using Meerkat.Abstractions;
 using Meerkat.App.Hotkeys;
 using Meerkat.App.Settings;
@@ -23,20 +22,11 @@ public sealed partial class WidgetToggleViewModel(string id, string title, strin
     [ObservableProperty]
     private bool _isEnabled = isEnabled;
 
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ResetPositionCommand))]
-    private bool _isResetPending;
-
     public string Id { get; } = id;
 
     public string Title { get; } = title;
 
     public string TypeName { get; } = typeName;
-
-    [RelayCommand(CanExecute = nameof(CanResetPosition))]
-    private void ResetPosition() => IsResetPending = true;
-
-    private bool CanResetPosition() => !IsResetPending;
 }
 
 public sealed partial class SettingsViewModel : ObservableObject
@@ -46,7 +36,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     private readonly SettingsService _settings;
 
     [ObservableProperty]
-    private string _toggleModeHotkey;
+    private string _togglePanelHotkey;
 
     [ObservableProperty]
     private string _toggleVisibilityHotkey;
@@ -96,7 +86,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         ];
 
         var current = settings.Current;
-        _toggleModeHotkey = HotkeyGesture.ToDisplayText(current.ToggleModeHotkey);
+        _togglePanelHotkey = HotkeyGesture.ToDisplayText(current.TogglePanelHotkey);
         _toggleVisibilityHotkey = HotkeyGesture.ToDisplayText(current.ToggleVisibilityHotkey);
         _opacity = current.Opacity;
         _selectedMonitor = monitors.FirstOrDefault(option => option.DeviceName == current.Monitor) ?? monitors[0];
@@ -131,14 +121,14 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public bool TrySave()
     {
-        if (!HotkeyGesture.TryParse(ToggleModeHotkey, out var toggleMode)
+        if (!HotkeyGesture.TryParse(TogglePanelHotkey, out var togglePanel)
             || !HotkeyGesture.TryParse(ToggleVisibilityHotkey, out var toggleVisibility))
         {
             ErrorMessage = "Hotkeys need at least one modifier and a key, e.g. Ctrl+Alt+O.";
             return false;
         }
 
-        if (toggleMode == toggleVisibility)
+        if (togglePanel == toggleVisibility)
         {
             ErrorMessage = "The two hotkeys must differ.";
             return false;
@@ -152,7 +142,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             }
 
             var current = _settings.Current;
-            current.ToggleModeHotkey = toggleMode.ToString();
+            current.TogglePanelHotkey = togglePanel.ToString();
             current.ToggleVisibilityHotkey = toggleVisibility.ToString();
             current.Opacity = Opacity;
             current.Monitor = SelectedMonitor.DeviceName;
@@ -160,11 +150,6 @@ public sealed partial class SettingsViewModel : ObservableObject
             current.Updates.CheckAutomatically = CheckForUpdatesAutomatically;
             current.Updates.DownloadInBackground = DownloadUpdatesInBackground;
             current.Updates.Channel = SelectedChannel.Channel;
-            foreach (var widget in Widgets.Where(widget => widget.IsResetPending))
-            {
-                LayoutService.Reset(current, widget.Id);
-            }
-
             _settings.Save();
         }
         catch (Exception exception)

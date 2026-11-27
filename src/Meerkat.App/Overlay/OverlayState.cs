@@ -6,9 +6,9 @@ public sealed class OverlayState : IOverlayState
 {
     public bool IsVisible { get; private set; }
 
-    public OverlayMode Mode { get; private set; } = OverlayMode.Display;
+    public bool IsPanelOpen { get; private set; }
 
-    public string ModeHotkeyText { get; private set; } = string.Empty;
+    public string PanelHotkeyText { get; private set; } = string.Empty;
 
     public string VisibilityHotkeyText { get; private set; } = string.Empty;
 
@@ -23,29 +23,18 @@ public sealed class OverlayState : IOverlayState
         }
     }
 
-    public void SetMode(OverlayMode mode)
+    public void SetPanelOpen(bool isPanelOpen)
     {
-        if (Mode != mode)
+        if (IsPanelOpen != isPanelOpen)
         {
-            Mode = mode;
+            IsPanelOpen = isPanelOpen;
             Changed?.Invoke(this, EventArgs.Empty);
         }
     }
 
-    public string? Notice { get; private set; }
-
-    public void SetNotice(string? notice)
+    public void SetHotkeyTexts(string panelHotkeyText, string visibilityHotkeyText)
     {
-        if (Notice != notice)
-        {
-            Notice = notice;
-            Changed?.Invoke(this, EventArgs.Empty);
-        }
-    }
-
-    public void SetHotkeyTexts(string modeHotkeyText, string visibilityHotkeyText)
-    {
-        ModeHotkeyText = modeHotkeyText;
+        PanelHotkeyText = panelHotkeyText;
         VisibilityHotkeyText = visibilityHotkeyText;
         Changed?.Invoke(this, EventArgs.Empty);
     }

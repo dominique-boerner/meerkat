@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Meerkat.Abstractions;
@@ -12,28 +11,23 @@ public sealed partial class DockerWidgetViewModel(
     IContainerProvider provider,
     IOverlayState overlayState,
     IOverlayCommands overlayCommands,
-    DockerSettingsSource settingsSource) : ObservableObject
+    DockerSettingsSource settingsSource,
+    TimeProvider timeProvider) : ObservableObject
 {
     private const string DefaultDistributionLabel = "Default distribution";
+    private const string StatusLabel = "Docker";
 
     private readonly string?[] _errors = new string?[Enum.GetValues<ErrorSource>().Length];
+
+    // When each problem was first seen, so that alerts can show how long it has lasted.
+    private readonly Dictionary<string, DateTimeOffset> _restartingSince = [];
+    private DateTimeOffset? _failingSince;
 
     private CancellationTokenSource? _cancellation;
     private Task _pollingLoops = Task.CompletedTask;
 
     [ObservableProperty]
     private string? _errorMessage;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsDisplayMode))]
-    private bool _isInteractive;
-
-    [ObservableProperty]
-    private string _modeHotkeyText = string.Empty;
-
-    /// <summary>Message from the shell shown in the footer instead of the hotkey hint, e.g. a pending update.</summary>
-    [ObservableProperty]
-    private string? _notice;
 
     [ObservableProperty]
     private LogPanelViewModel? _logPanel;
@@ -52,20 +46,26 @@ public sealed partial class DockerWidgetViewModel(
     [ObservableProperty]
     private string _summary = string.Empty;
 
-    [ObservableProperty]
-    private string _intervalText = string.Empty;
-
     private enum ErrorSource
     {
         Stats,
         Action,
     }
 
+    /// <summary>Raised when <see cref="Status"/> or <see cref="Alerts"/> changed.</summary>
+    public event EventHandler? StatusChanged;
+
     public ObservableCollection<ContainerRowViewModel> Containers { get; } = [];
 
-    public bool IsDisplayMode => !IsInteractive;
+    /// <summary>Containers stuck in a restart loop; shown as banners above the list.</summary>
+    public ObservableCollection<ContainerRowViewModel> RestartingContainers { get; } = [];
 
     public bool IsEmpty => HasLoaded && Failure is null && Containers.Count == 0;
+
+    /// <summary>The widget's entry in the status bar; null until the first poll has finished.</summary>
+    public WidgetStatus? Status { get; private set; }
+
+    public IReadOnlyList<WidgetAlert> Alerts { get; private set; } = [];
 
     public void Start()
     {
@@ -76,10 +76,7 @@ public sealed partial class DockerWidgetViewModel(
 
         _cancellation = new CancellationTokenSource();
         var cancellationToken = _cancellation.Token;
-
-        overlayState.Changed += OnOverlayStateChanged;
-        OnOverlayStateChanged(this, EventArgs.Empty);
-        UpdateSettingsTexts();
+        UpdateDistributionLabel();
 
         _pollingLoops = Task.WhenAll(
             RunPollingLoopAsync(() => settingsSource.Current.ListInterval, RefreshListAsync, cancellationToken),
@@ -93,7 +90,6 @@ public sealed partial class DockerWidgetViewModel(
             return;
         }
 
-        overlayState.Changed -= OnOverlayStateChanged;
         await _cancellation.CancelAsync();
         await _pollingLoops;
         _cancellation.Dispose();
@@ -207,7 +203,7 @@ public sealed partial class DockerWidgetViewModel(
 
     private async Task RefreshListAsync(CancellationToken cancellationToken)
     {
-        UpdateSettingsTexts();
+        UpdateDistributionLabel();
 
         IReadOnlyList<ContainerInfo> containers;
         try
@@ -218,6 +214,7 @@ public sealed partial class DockerWidgetViewModel(
         {
             Failure = ContainerFailureViewModel.From(exception, DistributionLabel);
             Summary = string.Empty;
+            UpdateStatus();
             return;
         }
 
@@ -251,6 +248,7 @@ public sealed partial class DockerWidgetViewModel(
         HasLoaded = true;
         Summary = $"{Containers.Count(row => row.IsRunning)} of {Containers.Count} running";
         OnPropertyChanged(nameof(IsEmpty));
+        UpdateStatus();
     }
 
     private async Task RefreshStatsAsync(CancellationToken cancellationToken)
@@ -291,25 +289,69 @@ public sealed partial class DockerWidgetViewModel(
         }
     }
 
+    /// <summary>Derives what the shell shows about this widget from the current list and failure.</summary>
+    private void UpdateStatus()
+    {
+        var now = timeProvider.GetLocalNow();
+        var running = Containers.Count(row => row.IsRunning);
+
+        if (Failure is { } failure)
+        {
+            _failingSince ??= now;
+
+            // While Docker cannot be reached nothing is known to be running, whatever the last list said.
+            Status = new WidgetStatus(StatusLabel, Containers.Count > 0 ? $"0/{Containers.Count}" : "–", WidgetSeverity.Error);
+            Alerts = [new WidgetAlert(WidgetSeverity.Error, failure.Title, $"{failure.Message} · {DistributionLabel}", _failingSince.Value)];
+        }
+        else
+        {
+            _failingSince = null;
+            var restarting = Containers.Where(row => row.StatusKind == ContainerStatusKind.Restarting).ToList();
+            foreach (var name in _restartingSince.Keys.Except(restarting.Select(row => row.Name)).ToList())
+            {
+                _restartingSince.Remove(name);
+            }
+
+            foreach (var row in restarting)
+            {
+                _restartingSince.TryAdd(row.Name, now);
+            }
+
+            Status = new WidgetStatus(
+                StatusLabel,
+                $"{running}/{Containers.Count}",
+                restarting.Count > 0 ? WidgetSeverity.Warning : WidgetSeverity.Ok);
+            Alerts = [.. restarting.Select(row => new WidgetAlert(
+                WidgetSeverity.Warning,
+                $"{row.Name} keeps restarting",
+                row.Status,
+                _restartingSince[row.Name]))];
+        }
+
+        var restartingRows = Failure is null
+            ? Containers.Where(row => row.StatusKind == ContainerStatusKind.Restarting).ToList()
+            : [];
+        if (!RestartingContainers.SequenceEqual(restartingRows))
+        {
+            RestartingContainers.Clear();
+            foreach (var row in restartingRows)
+            {
+                RestartingContainers.Add(row);
+            }
+        }
+
+        StatusChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     private void SetError(ErrorSource source, string? message)
     {
         _errors[(int)source] = message;
         ErrorMessage = _errors.FirstOrDefault(error => error is not null);
     }
 
-    private void UpdateSettingsTexts()
+    private void UpdateDistributionLabel()
     {
-        var settings = settingsSource.Current;
-        var culture = CultureInfo.CurrentCulture;
-        DistributionLabel = string.IsNullOrWhiteSpace(settings.Distribution) ? DefaultDistributionLabel : settings.Distribution;
-        IntervalText = $"List every {settings.ListInterval.TotalSeconds.ToString("0.#", culture)} s"
-            + $" · Stats every {settings.StatsInterval.TotalSeconds.ToString("0.#", culture)} s";
-    }
-
-    private void OnOverlayStateChanged(object? sender, EventArgs e)
-    {
-        IsInteractive = overlayState.Mode == OverlayMode.Interactive;
-        ModeHotkeyText = overlayState.ModeHotkeyText;
-        Notice = overlayState.Notice;
+        var distribution = settingsSource.Current.Distribution;
+        DistributionLabel = string.IsNullOrWhiteSpace(distribution) ? DefaultDistributionLabel : distribution;
     }
 }

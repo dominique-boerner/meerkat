@@ -1,4 +1,5 @@
 using System.Globalization;
+using Meerkat.Abstractions;
 using Meerkat.Widgets.Git.Providers;
 
 namespace Meerkat.Widgets.Git.ViewModels;
@@ -10,19 +11,22 @@ public enum GitFailureIcon
     Clock,
 }
 
+/// <param name="AlertSeverity">How the shell should report the failure; null for states that are no problem, such as not being set up yet.</param>
 public sealed record GitFailureViewModel(
     string Title,
     string Message,
     GitFailureIcon Icon,
     bool CanRenewToken,
-    bool CanOpenSettings)
+    bool CanOpenSettings,
+    WidgetSeverity? AlertSeverity)
 {
     public static GitFailureViewModel NotConfigured(GitTerminology terminology) => new(
         $"Connect {terminology.ProviderName}",
         $"Add a personal access token in the settings to see your {terminology.PipelinesTitle.ToLowerInvariant()} and reviews.",
         GitFailureIcon.Key,
         CanRenewToken: false,
-        CanOpenSettings: true);
+        CanOpenSettings: true,
+        AlertSeverity: null);
 
     /// <param name="lastRefreshed">When data was last loaded successfully; null if never.</param>
     public static GitFailureViewModel From(Exception exception, GitTerminology terminology, DateTimeOffset? lastRefreshed)
@@ -38,7 +42,8 @@ public sealed record GitFailureViewModel(
                 exception.Message + staleHint,
                 GitFailureIcon.Error,
                 CanRenewToken: false,
-                CanOpenSettings: true);
+                CanOpenSettings: true,
+                WidgetSeverity.Error);
         }
 
         return failure.Kind switch
@@ -48,7 +53,10 @@ public sealed record GitFailureViewModel(
                 failure.Message + staleHint,
                 GitFailureIcon.Key,
                 CanRenewToken: true,
-                CanOpenSettings: true),
+                CanOpenSettings: true,
+                WidgetSeverity.Error),
+
+            // A rate limit resolves itself; it is worth a hint, not an alarm.
             GitFailureKind.RateLimited => new GitFailureViewModel(
                 $"{terminology.ProviderName}: rate limit reached",
                 failure.RetryAt is { } retryAt
@@ -56,19 +64,22 @@ public sealed record GitFailureViewModel(
                     : "The widget pauses and tries again later.",
                 GitFailureIcon.Clock,
                 CanRenewToken: false,
-                CanOpenSettings: false),
+                CanOpenSettings: false,
+                WidgetSeverity.Warning),
             GitFailureKind.Unreachable => new GitFailureViewModel(
                 $"{terminology.ProviderName} is not reachable",
                 failure.Message + staleHint,
                 GitFailureIcon.Error,
                 CanRenewToken: false,
-                CanOpenSettings: true),
+                CanOpenSettings: true,
+                WidgetSeverity.Error),
             _ => new GitFailureViewModel(
                 $"{terminology.ProviderName} request failed",
                 failure.Message + staleHint,
                 GitFailureIcon.Error,
                 CanRenewToken: false,
-                CanOpenSettings: true),
+                CanOpenSettings: true,
+                WidgetSeverity.Error),
         };
     }
 
