@@ -113,19 +113,6 @@
         <Border Grid.Row="0" BorderBrush="{StaticResource Overlay.Border}" BorderThickness="0,0,0,1" Padding="16,0,8,0">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Command="{Binding TogglePinCommand}" Padding="8,6" FontSize="12" ToolTip="Keep the panel open">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource Overlay.IconButton}">
-                                <Setter Property="Content" Value="&#xE718;" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsPinned}" Value="True">
-                                        <Setter Property="Content" Value="&#xE77A;" />
-                                        <Setter Property="Foreground" Value="{StaticResource Overlay.Accent}" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                    </Button>
                     <Button Style="{StaticResource Overlay.IconButton}"
                             Content="&#xE713;"
                             Padding="8,6"

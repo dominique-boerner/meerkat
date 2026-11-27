@@ -129,7 +129,7 @@ public class ShellViewModelTests
     }
 
     [Fact]
-    public void Panel_RaisesRequestsAndRemembersThePin()
+    public void Panel_RaisesCloseAndSettingsRequests()
     {
         var panel = new PanelViewModel();
         var closed = 0;
@@ -137,11 +137,9 @@ public class ShellViewModelTests
         panel.CloseRequested += (_, _) => closed++;
         panel.SettingsRequested += (_, _) => settingsRequested++;
 
-        panel.TogglePinCommand.Execute(null);
         panel.CloseCommand.Execute(null);
         panel.OpenSettingsCommand.Execute(null);
 
-        Assert.True(panel.IsPinned);
         Assert.Equal(1, closed);
         Assert.Equal(1, settingsRequested);
     }

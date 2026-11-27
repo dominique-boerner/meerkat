@@ -44,10 +44,6 @@ public sealed partial class PanelViewModel : ObservableObject
     [ObservableProperty]
     private string _attentionText = string.Empty;
 
-    /// <summary>A pinned panel stays open when another window gets the focus.</summary>
-    [ObservableProperty]
-    private bool _isPinned;
-
     public event EventHandler? CloseRequested;
 
     public event EventHandler? SettingsRequested;
@@ -97,9 +93,6 @@ public sealed partial class PanelViewModel : ObservableObject
 
         SelectedWidget = widget;
     }
-
-    [RelayCommand]
-    private void TogglePin() => IsPinned = !IsPinned;
 
     [RelayCommand]
     private void Close() => CloseRequested?.Invoke(this, EventArgs.Empty);

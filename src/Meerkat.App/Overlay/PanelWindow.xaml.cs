@@ -27,7 +27,10 @@ public partial class PanelWindow : Window
         InitializeComponent();
     }
 
-    /// <summary>Raised when the user leaves the panel, by pressing Escape or by switching to another window.</summary>
+    /// <summary>
+    /// Raised when the user presses Escape. Losing the focus does not dismiss the panel: it is meant to stay
+    /// next to the work it informs about.
+    /// </summary>
     public event EventHandler? Dismissed;
 
     /// <summary>
@@ -102,17 +105,6 @@ public partial class PanelWindow : Window
         if (e.Key == Key.Escape)
         {
             e.Handled = true;
-            Dismissed?.Invoke(this, EventArgs.Empty);
-        }
-    }
-
-    protected override void OnDeactivated(EventArgs e)
-    {
-        base.OnDeactivated(e);
-
-        // A pinned panel is meant to stay next to the work it informs about.
-        if (DataContext is PanelViewModel { IsPinned: false })
-        {
             Dismissed?.Invoke(this, EventArgs.Empty);
         }
     }

@@ -25,8 +25,8 @@ inside WSL, for GitLab and GitHub, and for servers reachable over SSH.
 - *Status bar*: one chip per widget, always on top, click-through, never takes focus
 - Errors appear as cards below the status bar with their age; warnings are only counted, so the bar
   stays small
-- *Panel*: a side panel, opened with a global hotkey, with one page per widget, badges for widgets
-  that need attention, and a pin to keep it open
+- *Panel*: a side panel, opened with a global hotkey, with one page per widget and badges for
+  widgets that need attention; it stays open next to your work until you close it
 - A second hotkey hides and shows Meerkat entirely; hidden widgets stop polling
 - Tray icon with quick access to the panel, the settings and exit
 - Per-monitor DPI aware; choose the monitor the status bar and the panel appear on
@@ -86,8 +86,8 @@ Meerkat shows its status bar in the top right corner and adds an icon to the not
 | Open or close the panel | `Ctrl+Alt+M` |
 | Hide or show Meerkat | `Ctrl+Alt+H` |
 
-The panel closes when you press `Esc`, press the hotkey again or switch to another window. Pin it to
-keep it open next to your work. Drag its left edge to change the width, for example to read long log
+The panel stays open while you work in other windows. It closes when you press `Esc` inside it,
+press the hotkey again or use its close button. Drag its left edge to change the width, for example to read long log
 lines; a double-click on the edge restores the default. Both actions are also available from the tray icon.
 
 ### Configuration
