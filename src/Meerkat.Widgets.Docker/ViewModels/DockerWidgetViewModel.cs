@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Meerkat.Abstractions;
@@ -7,351 +8,213 @@ using Meerkat.Widgets.Docker.Settings;
 
 namespace Meerkat.Widgets.Docker.ViewModels;
 
+/// <summary>
+/// The Docker page: the local Docker instance in WSL, followed by the instances on other machines the
+/// user added. Each source polls on its own; this class adds them up for the shell.
+/// </summary>
 public sealed partial class DockerWidgetViewModel(
-    IContainerProvider provider,
+    IContainerProvider localProvider,
     IOverlayState overlayState,
     IOverlayCommands overlayCommands,
     DockerSettingsSource settingsSource,
-    TimeProvider timeProvider) : ObservableObject
+    TimeProvider timeProvider,
+    Func<DockerHost, IContainerProvider>? remoteProviderFactory = null) : ObservableObject
 {
-    private const string DefaultDistributionLabel = "Default distribution";
     private const string StatusLabel = "Docker";
 
-    private readonly string?[] _errors = new string?[Enum.GetValues<ErrorSource>().Length];
-
-    // When each problem was first seen, so that alerts can show how long it has lasted.
-    private readonly Dictionary<string, DateTimeOffset> _restartingSince = [];
-    private DateTimeOffset? _failingSince;
-
-    private CancellationTokenSource? _cancellation;
-    private Task _pollingLoops = Task.CompletedTask;
-
-    [ObservableProperty]
-    private string? _errorMessage;
+    private bool _isStarted;
 
     [ObservableProperty]
     private LogPanelViewModel? _logPanel;
 
+    /// <summary>What the heading says besides the summary: the distribution, or how many sources there are.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsEmpty))]
-    private ContainerFailureViewModel? _failure;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsEmpty))]
-    private bool _hasLoaded;
-
-    [ObservableProperty]
-    private string _distributionLabel = DefaultDistributionLabel;
+    private string _sourceLabel = string.Empty;
 
     [ObservableProperty]
     private string _summary = string.Empty;
 
-    private enum ErrorSource
-    {
-        Stats,
-        Action,
-    }
-
     /// <summary>Raised when <see cref="Status"/> or <see cref="Alerts"/> changed.</summary>
     public event EventHandler? StatusChanged;
 
-    public ObservableCollection<ContainerRowViewModel> Containers { get; } = [];
+    /// <summary>The local source first, then the remote ones in the order of the settings.</summary>
+    public ObservableCollection<ContainerSourceViewModel> Sources { get; } = [];
 
-    /// <summary>Containers stuck in a restart loop; shown as banners above the list.</summary>
-    public ObservableCollection<ContainerRowViewModel> RestartingContainers { get; } = [];
-
-    public bool IsEmpty => HasLoaded && Failure is null && Containers.Count == 0;
-
-    /// <summary>The widget's entry in the status bar; null until the first poll has finished.</summary>
+    /// <summary>The widget's entry in the status bar; null until a source has answered.</summary>
     public WidgetStatus? Status { get; private set; }
 
     public IReadOnlyList<WidgetAlert> Alerts { get; private set; } = [];
 
     public void Start()
     {
-        if (_cancellation is not null)
+        if (_isStarted)
         {
             return;
         }
 
-        _cancellation = new CancellationTokenSource();
-        var cancellationToken = _cancellation.Token;
-        UpdateDistributionLabel();
-
-        _pollingLoops = Task.WhenAll(
-            RunPollingLoopAsync(() => settingsSource.Current.ListInterval, RefreshListAsync, cancellationToken),
-            RunPollingLoopAsync(() => settingsSource.Current.StatsInterval, RefreshStatsAsync, cancellationToken));
+        _isStarted = true;
+        settingsSource.Changed += OnSettingsChanged;
+        AddSource(new ContainerSourceViewModel(localProvider, overlayState, overlayCommands, ContainerSourceOptions.ForLocal(settingsSource), timeProvider));
+        AddRemoteSources();
     }
 
     public async Task StopAsync()
     {
-        if (_cancellation is null)
+        if (!_isStarted)
         {
             return;
         }
 
-        await _cancellation.CancelAsync();
-        await _pollingLoops;
-        _cancellation.Dispose();
-        _cancellation = null;
-        CloseLogs();
+        _isStarted = false;
+        settingsSource.Changed -= OnSettingsChanged;
+        var sources = Sources.ToList();
+        Sources.Clear();
+        await Task.WhenAll(sources.Select(RemoveSourceAsync));
+        LogPanel = null;
     }
 
     [RelayCommand]
-    private async Task RefreshAsync()
-    {
-        var cancellationToken = _cancellation?.Token ?? CancellationToken.None;
-        try
-        {
-            await RefreshListAsync(cancellationToken);
-            await RefreshStatsAsync(cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            // Widget was stopped during the refresh.
-        }
-    }
+    private Task RefreshAsync() => Task.WhenAll(Sources.Select(source => source.RefreshCommand.ExecuteAsync(null)));
 
     [RelayCommand]
     private void OpenSettings() => overlayCommands.OpenSettings();
 
-    [RelayCommand]
-    private Task StartContainerAsync(ContainerRowViewModel container) =>
-        RunActionAsync(token => provider.StartAsync(container.Id, token));
-
-    [RelayCommand]
-    private Task StopContainerAsync(ContainerRowViewModel container) =>
-        RunActionAsync(token => provider.StopAsync(container.Id, token));
-
-    [RelayCommand]
-    private Task RestartContainerAsync(ContainerRowViewModel container) =>
-        RunActionAsync(token => provider.RestartAsync(container.Id, token));
-
-    [RelayCommand]
-    private void ShowLogs(ContainerRowViewModel container)
+    private void AddRemoteSources()
     {
-        CloseLogs();
-        container.IsLogTarget = true;
-
-        var settings = settingsSource.Current;
-        var distribution = string.IsNullOrWhiteSpace(settings.Distribution) ? string.Empty : $" -d {settings.Distribution}";
-        var panel = new LogPanelViewModel(
-            provider,
-            container.Id,
-            container.Name,
-            settings.EffectiveMaxLogLines,
-            $"wsl{distribution} docker logs -f --tail {WslCliContainerProvider.LogTailLines} {container.Name}",
-            CloseLogs);
-        LogPanel = panel;
-        panel.Start();
-    }
-
-    [RelayCommand]
-    private void CloseLogs()
-    {
-        foreach (var row in Containers)
+        if (remoteProviderFactory is null)
         {
-            row.IsLogTarget = false;
-        }
-
-        LogPanel?.Stop();
-        LogPanel = null;
-    }
-
-    private async Task RunPollingLoopAsync(
-        Func<TimeSpan> interval,
-        Func<CancellationToken, Task> poll,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            while (true)
-            {
-                await WaitUntilVisibleAsync(cancellationToken);
-                await poll(cancellationToken);
-                await Task.Delay(interval(), cancellationToken);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Widget was stopped.
-        }
-    }
-
-    private async Task WaitUntilVisibleAsync(CancellationToken cancellationToken)
-    {
-        while (!overlayState.IsVisible)
-        {
-            var changed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            void OnChanged(object? sender, EventArgs e) => changed.TrySetResult();
-
-            overlayState.Changed += OnChanged;
-            try
-            {
-                // Re-check after subscribing so a change between the loop condition and the subscription is not missed.
-                if (!overlayState.IsVisible)
-                {
-                    await changed.Task.WaitAsync(cancellationToken);
-                }
-            }
-            finally
-            {
-                overlayState.Changed -= OnChanged;
-            }
-        }
-    }
-
-    private async Task RefreshListAsync(CancellationToken cancellationToken)
-    {
-        UpdateDistributionLabel();
-
-        IReadOnlyList<ContainerInfo> containers;
-        try
-        {
-            containers = await provider.ListAsync(cancellationToken);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            Failure = ContainerFailureViewModel.From(exception, DistributionLabel);
-            Summary = string.Empty;
-            UpdateStatus();
             return;
         }
 
-        var ordered = containers.OrderBy(container => container.Name, StringComparer.OrdinalIgnoreCase).ToList();
-        var existing = Containers.ToDictionary(row => row.Id);
-
-        for (var index = 0; index < ordered.Count; index++)
+        foreach (var host in settingsSource.Current.RemoteHosts)
         {
-            var info = ordered[index];
-            if (existing.Remove(info.Id, out var row))
-            {
-                row.Apply(info);
-                var currentIndex = Containers.IndexOf(row);
-                if (currentIndex != index)
-                {
-                    Containers.Move(currentIndex, index);
-                }
-            }
-            else
-            {
-                Containers.Insert(index, new ContainerRowViewModel(info));
-            }
-        }
-
-        foreach (var removed in existing.Values)
-        {
-            Containers.Remove(removed);
-        }
-
-        Failure = null;
-        HasLoaded = true;
-        Summary = $"{Containers.Count(row => row.IsRunning)} of {Containers.Count} running";
-        OnPropertyChanged(nameof(IsEmpty));
-        UpdateStatus();
-    }
-
-    private async Task RefreshStatsAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            var stats = await provider.GetStatsAsync(cancellationToken);
-            foreach (var row in Containers)
-            {
-                row.ApplyStats(stats.FirstOrDefault(row.Matches));
-            }
-
-            SetError(ErrorSource.Stats, null);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            // While the list itself fails, the failure card already explains the problem.
-            SetError(ErrorSource.Stats, Failure is null ? exception.Message : null);
+            AddSource(new ContainerSourceViewModel(
+                remoteProviderFactory(host),
+                overlayState,
+                overlayCommands,
+                ContainerSourceOptions.ForRemote(host, settingsSource),
+                timeProvider));
         }
     }
 
-    private async Task RunActionAsync(Func<CancellationToken, Task> action)
+    private void AddSource(ContainerSourceViewModel source)
     {
-        var cancellationToken = _cancellation?.Token ?? CancellationToken.None;
-        try
+        source.IsExpanded = !settingsSource.Current.CollapsedSources.Contains(source.Id);
+        source.StatusChanged += OnSourceStatusChanged;
+        source.PropertyChanged += OnSourcePropertyChanged;
+        Sources.Add(source);
+        UpdateHeadings();
+        source.Start();
+    }
+
+    private async Task RemoveSourceAsync(ContainerSourceViewModel source)
+    {
+        source.StatusChanged -= OnSourceStatusChanged;
+        source.PropertyChanged -= OnSourcePropertyChanged;
+        await source.StopAsync();
+    }
+
+    private async void OnSettingsChanged(object? sender, EventArgs e)
+    {
+        // Hosts may have been added, removed or changed; the local source reads its settings as it goes.
+        var removed = Sources.Where(source => source.IsRemote).ToList();
+        foreach (var source in removed)
         {
-            await action(cancellationToken);
-            SetError(ErrorSource.Action, null);
-            await RefreshListAsync(cancellationToken);
+            Sources.Remove(source);
         }
-        catch (OperationCanceledException)
+
+        // Right away, not after the removed sources have stopped: a lone source needs no heading.
+        UpdateHeadings();
+        await Task.WhenAll(removed.Select(RemoveSourceAsync));
+        if (_isStarted)
         {
-            // Widget was stopped while the action was running.
-        }
-        catch (Exception exception)
-        {
-            SetError(ErrorSource.Action, exception.Message);
+            AddRemoteSources();
+            UpdateHeadings();
+            UpdateStatus();
         }
     }
 
-    /// <summary>Derives what the shell shows about this widget from the current list and failure.</summary>
-    private void UpdateStatus()
+    private void OnSourceStatusChanged(object? sender, EventArgs e) => UpdateStatus();
+
+    private void OnSourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        var now = timeProvider.GetLocalNow();
-        var running = Containers.Count(row => row.IsRunning);
-
-        if (Failure is { } failure)
+        if (sender is not ContainerSourceViewModel changed)
         {
-            _failingSince ??= now;
+            return;
+        }
 
-            // While Docker cannot be reached nothing is known to be running, whatever the last list said.
-            Status = new WidgetStatus(StatusLabel, Containers.Count > 0 ? $"0/{Containers.Count}" : "–", WidgetSeverity.Error);
-            Alerts = [new WidgetAlert(WidgetSeverity.Error, failure.Title, $"{failure.Message} · {DistributionLabel}", _failingSince.Value)];
+        if (e.PropertyName == nameof(ContainerSourceViewModel.IsExpanded))
+        {
+            RememberExpansion(changed);
+            return;
+        }
+
+        if (e.PropertyName != nameof(ContainerSourceViewModel.LogPanel))
+        {
+            return;
+        }
+
+        // The page has room for one log; opening another one closes the one that was shown.
+        if (changed.LogPanel is not null)
+        {
+            foreach (var other in Sources.Where(source => source != changed && source.LogPanel is not null))
+            {
+                other.CloseLogsCommand.Execute(null);
+            }
+        }
+
+        LogPanel = Sources.Select(source => source.LogPanel).FirstOrDefault(panel => panel is not null);
+    }
+
+    private void RememberExpansion(ContainerSourceViewModel source)
+    {
+        var collapsed = settingsSource.Current.CollapsedSources;
+        var isListed = collapsed.Contains(source.Id);
+        if (isListed == !source.IsExpanded)
+        {
+            return;
+        }
+
+        if (source.IsExpanded)
+        {
+            collapsed.Remove(source.Id);
         }
         else
         {
-            _failingSince = null;
-            var restarting = Containers.Where(row => row.StatusKind == ContainerStatusKind.Restarting).ToList();
-            foreach (var name in _restartingSince.Keys.Except(restarting.Select(row => row.Name)).ToList())
-            {
-                _restartingSince.Remove(name);
-            }
-
-            foreach (var row in restarting)
-            {
-                _restartingSince.TryAdd(row.Name, now);
-            }
-
-            Status = new WidgetStatus(
-                StatusLabel,
-                $"{running}/{Containers.Count}",
-                restarting.Count > 0 ? WidgetSeverity.Warning : WidgetSeverity.Ok);
-            Alerts = [.. restarting.Select(row => new WidgetAlert(
-                WidgetSeverity.Warning,
-                $"{row.Name} keeps restarting",
-                row.Status,
-                _restartingSince[row.Name]))];
+            collapsed.Add(source.Id);
         }
 
-        var restartingRows = Failure is null
-            ? Containers.Where(row => row.StatusKind == ContainerStatusKind.Restarting).ToList()
-            : [];
-        if (!RestartingContainers.SequenceEqual(restartingRows))
+        // Saved without announcing new settings, which would rebuild the sources and lose what they show.
+        settingsSource.Save();
+    }
+
+    private void UpdateHeadings()
+    {
+        foreach (var source in Sources)
         {
-            RestartingContainers.Clear();
-            foreach (var row in restartingRows)
-            {
-                RestartingContainers.Add(row);
-            }
+            source.ShowHeading = Sources.Count > 1;
         }
+    }
 
+    /// <summary>Adds up what the sources report, so that the shell sees one widget.</summary>
+    private void UpdateStatus()
+    {
+        var reporting = Sources.Where(source => source.Status is not null).ToList();
+        var running = reporting.Sum(source => source.RunningCount);
+        var total = reporting.Sum(source => source.TotalCount);
+
+        Alerts = [.. Sources.SelectMany(source => source.Alerts)];
+        Status = reporting.Count == 0
+            ? null
+            : new WidgetStatus(
+                StatusLabel,
+
+                // With nothing to count, as while the only source cannot be reached, a dash says more than 0/0.
+                total > 0 ? $"{running}/{total}" : "–",
+                reporting.Max(source => source.Status!.Severity));
+
+        Summary = Sources.Count == 1 ? Sources[0].Summary : reporting.Count == 0 ? string.Empty : $"{running} of {total} running";
+        SourceLabel = Sources.Count == 1 ? Sources[0].Label : $"{Sources.Count} sources";
         StatusChanged?.Invoke(this, EventArgs.Empty);
-    }
-
-    private void SetError(ErrorSource source, string? message)
-    {
-        _errors[(int)source] = message;
-        ErrorMessage = _errors.FirstOrDefault(error => error is not null);
-    }
-
-    private void UpdateDistributionLabel()
-    {
-        var distribution = settingsSource.Current.Distribution;
-        DistributionLabel = string.IsNullOrWhiteSpace(distribution) ? DefaultDistributionLabel : distribution;
     }
 }

@@ -39,10 +39,12 @@ services, and for notes.
 **Docker widget**
 
 - Lists all containers of a WSL distribution with status, CPU and memory usage
-- Start, stop and restart containers from the panel
+- Shows the containers of other machines as well, reached over SSH, one section per machine that
+  can be folded up
+- Start, stop and restart containers from the panel; other machines are read-only unless you allow it
 - Live log viewer with text filter, stdout/stderr toggles, pause, and a bounded line buffer
-- Warns about containers stuck in a restart loop and reports an unreachable WSL distribution or
-  Docker daemon as an error
+- Warns about containers stuck in a restart loop and reports an unreachable WSL distribution, host
+  or Docker daemon as an error
 
 **Git widget**
 
@@ -86,7 +88,7 @@ services, and for notes.
 |---|---|
 | Operating system | Windows 10 or 11, x64 |
 | Runtime | [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) (not needed for the self-contained download) |
-| Docker widget | WSL 2 with Docker Engine installed **inside** a distribution. Docker Desktop is not required. |
+| Docker widget | WSL 2 with Docker Engine installed **inside** a distribution. Docker Desktop is not required. For other machines: the OpenSSH client of Windows and an SSH user who may use Docker on the host. |
 | Git widget | A personal access token for GitLab (gitlab.com or self-managed) or GitHub (github.com or Enterprise Server) |
 | Server widget | The OpenSSH client that ships with Windows (`ssh.exe`) and SSH access to the hosts; the hosts must run Linux |
 
@@ -149,6 +151,20 @@ The widget talks to Docker exclusively through `wsl.exe`, for example
 `wsl -d <distribution> --exec docker ps -a --format json`. Select the distribution in the settings;
 by default the WSL default distribution is used. The user Meerkat runs the commands as must be
 allowed to use Docker without `sudo`.
+
+To see the containers of another machine, add it under *Other machines (SSH)* in the same settings.
+Meerkat then runs the docker CLI on that machine through the OpenSSH client of Windows, signing in
+with your SSH agent or configuration, a key file, or a password kept in the Windows Credential
+Manager. Nothing is installed on the host and no port besides SSH is used.
+
+- The user you sign in with must be allowed to use Docker there, which usually means being in the
+  `docker` group. Bear in mind that this is close to root access to the host.
+- *Connect and check* makes the first connection, which is also the moment the host's key is stored
+  in `known_hosts`. Afterwards Meerkat only connects while the key stays the same.
+- A host is read-only by default: you see containers, figures and logs, but cannot start, stop or
+  restart anything. Allow that per host if you want it.
+- Every request opens an SSH connection, so other machines are asked every 20 seconds by default
+  instead of every few seconds.
 
 ### Git widget
 
@@ -245,6 +261,7 @@ dotnet run --project src/Meerkat.App
 |---|---|
 | `src/Meerkat.App` | The shell: status bar, panel, hotkeys, tray icon, settings, updates, widget hosting |
 | `src/Meerkat.Abstractions` | Contracts and shared visual theme for widgets |
+| `src/Meerkat.Ssh` | SSH access through the OpenSSH client of Windows, shared by the Docker and Server widgets |
 | `src/Meerkat.Widgets.Docker` | The Docker widget |
 | `src/Meerkat.Widgets.Git` | The Git widget for GitLab and GitHub |
 | `src/Meerkat.Widgets.Server` | The Server widget for machines reachable over SSH |

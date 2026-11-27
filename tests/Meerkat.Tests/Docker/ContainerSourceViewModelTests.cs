@@ -5,7 +5,7 @@ using Meerkat.Widgets.Docker.ViewModels;
 
 namespace Meerkat.Tests.Docker;
 
-public class DockerWidgetViewModelTests
+public class ContainerSourceViewModelTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
@@ -105,7 +105,7 @@ public class DockerWidgetViewModelTests
         Assert.Equal("WSL not reachable", viewModel.Failure.Title);
         Assert.Contains("\"Ubuntu-24.04\"", viewModel.Failure.Message);
         Assert.Equal("wsl -d Ubuntu-24.04 docker ps -a\n→ exit code -1", viewModel.Failure.Detail);
-        Assert.True(viewModel.Failure.CanChooseDistribution);
+        Assert.Equal("Choose distribution", viewModel.Failure.SettingsAction);
         Assert.Null(viewModel.ErrorMessage);
 
         // Nothing is known to be running while Docker cannot be asked.
@@ -166,8 +166,8 @@ public class DockerWidgetViewModelTests
         Assert.Equal(1, _overlayCommands.OpenSettingsCalls);
     }
 
-    private DockerWidgetViewModel CreateViewModel() =>
-        new(_provider, _overlayState, _overlayCommands, new DockerSettingsSource(_settingsStore), TimeProvider.System);
+    private ContainerSourceViewModel CreateViewModel() =>
+        new(_provider, _overlayState, _overlayCommands, ContainerSourceOptions.ForLocal(new DockerSettingsSource(_settingsStore)), TimeProvider.System);
 
     private static async Task WaitUntilAsync(Func<bool> condition)
     {

@@ -29,8 +29,24 @@ public enum ContainerFailureKind
     /// <summary>The distribution answers, but the Docker daemon does not.</summary>
     DaemonUnavailable,
 
-    /// <summary>The distribution has no docker CLI.</summary>
+    /// <summary>The distribution or the host has no docker CLI.</summary>
     DockerNotInstalled,
+
+    /// <summary>The user Meerkat signs in with may not talk to the Docker daemon of the host.</summary>
+    PermissionDenied,
+
+    /// <summary>ssh.exe could not be started.</summary>
+    SshUnavailable,
+
+    /// <summary>The host did not answer.</summary>
+    HostUnreachable,
+    AuthenticationFailed,
+
+    /// <summary>The host is not in known_hosts yet; it has to be confirmed once in the settings.</summary>
+    HostKeyUnknown,
+
+    /// <summary>The host presents a different key than the one in known_hosts.</summary>
+    HostKeyChanged,
 }
 
 public sealed class ContainerProviderException(ContainerFailureKind kind, string command, int? exitCode, string details)

@@ -4,6 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Meerkat.Abstractions\Meerkat.Abstractions.csproj" />
+    <ProjectReference Include="..\Meerkat.Ssh\Meerkat.Ssh.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />

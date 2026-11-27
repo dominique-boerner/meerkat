@@ -14,6 +14,9 @@ The section of a version becomes the text of its GitHub release and is what Meer
 - Services widget: watches external services such as GitHub, npm, Docker Hub or Maven Central by
   reading their status pages, and shows a disturbance with its incident, latest update and affected
   components. Any other address can be checked by its HTTP status or by a value in its JSON answer.
+- The Docker widget shows the containers of other machines, reached over SSH, with figures and logs.
+  Each machine gets its own section, which can be folded up, and is read-only unless starting and
+  stopping is allowed for it.
 - Meerkat can start when you sign in to Windows. Switch it on in the settings under *General*, the
   page formerly called *Appearance*.
 - Widgets can mark a warning as prominent, which shows it as a yellow card in the status bar.

@@ -198,6 +198,10 @@ Request these through constructor injection.
 | `IWidgetSecretStore` | Keep secrets such as access tokens in the Windows Credential Manager instead of the settings file. |
 | `IOverlayCommands` | Ask the shell to open the settings window or a web address in the browser. |
 
+A widget that needs to reach other machines can reference the `Meerkat.Ssh` project and request
+`ISshClient`. It runs commands through the OpenSSH client of Windows, so the user's SSH configuration,
+agent and `known_hosts` apply, and it never accepts a host key on its own while polling.
+
 ## Behaving well
 
 - **Keep reporting while the panel is closed.** The status bar depends on it. Only stop polling while

@@ -16,7 +16,7 @@
 
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
             <TextBlock Style="{DynamicResource Overlay.ColumnHeader}" FontSize="10.5" Text="CONTAINERS" />
-            <TextBlock Style="{DynamicResource Overlay.Hint}" Text="{Binding DistributionLabel, StringFormat=' · {0}'}" />
+            <TextBlock Style="{DynamicResource Overlay.Hint}" Text="{Binding SourceLabel, StringFormat=' · {0}'}" />
             <TextBlock Style="{DynamicResource Overlay.Hint}" Text="{Binding Summary, StringFormat=' · {0}'}" />
         </StackPanel>
     </DockPanel>
