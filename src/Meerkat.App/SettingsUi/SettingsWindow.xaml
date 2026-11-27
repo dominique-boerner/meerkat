@@ -4,7 +4,7 @@
         Title="Meerkat – Settings"
         Icon="/Assets/meerkat-app.ico"
         Width="660"
-        Height="690"
+        Height="420"
         WindowStyle="None"
         ResizeMode="NoResize"
         Topmost="True"
@@ -139,7 +139,7 @@
                         </DockPanel>
                     </StackPanel>
 
-                    <StackPanel x:Name="AppearanceSection" Margin="0,22,0,0">
+                    <StackPanel x:Name="AppearanceSection">
                         <TextBlock Style="{StaticResource Overlay.SectionTitle}" Text="Appearance" />
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -167,7 +167,7 @@
                         <TextBlock Style="{StaticResource Overlay.Hint}" Margin="162,2,0,0" Text="Positions are stored per monitor" />
                     </StackPanel>
 
-                    <StackPanel x:Name="WidgetsSection" Margin="0,22,0,0">
+                    <StackPanel x:Name="WidgetsSection">
                         <TextBlock Style="{StaticResource Overlay.SectionTitle}" Text="Widgets" />
                         <ItemsControl ItemsSource="{Binding Widgets}" Focusable="False">
                             <ItemsControl.ItemTemplate>
@@ -205,7 +205,7 @@
                     <ItemsControl x:Name="WidgetSections" ItemsSource="{Binding WidgetSections}" Focusable="False">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <StackPanel Margin="0,16,0,0">
+                                <StackPanel>
                                     <TextBlock Style="{StaticResource Overlay.SectionTitle}" Text="{Binding Title}" />
                                     <ContentPresenter Content="{Binding View}" />
                                 </StackPanel>

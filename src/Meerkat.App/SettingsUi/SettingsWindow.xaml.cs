@@ -15,6 +15,7 @@ public partial class SettingsWindow : Window
     public SettingsWindow()
     {
         InitializeComponent();
+        Loaded += (_, _) => ShowSelectedSection();
     }
 
     private void OnSaveClick(object sender, RoutedEventArgs e)
@@ -43,18 +44,37 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void OnNavigationSelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void OnNavigationSelectionChanged(object sender, SelectionChangedEventArgs e) => ShowSelectedSection();
+
+    /// <summary>Shows only the section selected in the navigation, like pages of a settings dialog.</summary>
+    private void ShowSelectedSection()
     {
-        FrameworkElement?[] shellSections = [HotkeysSection, AppearanceSection, WidgetsSection];
-        var index = Navigation.SelectedIndex;
-        if (index < 0)
+        // The selection is first set while the XAML is still loading, before the sections exist.
+        if (!IsInitialized)
         {
             return;
         }
 
-        var target = index < shellSections.Length
-            ? shellSections[index]
-            : WidgetSections.ItemContainerGenerator.ContainerFromIndex(index - shellSections.Length) as FrameworkElement;
-        target?.BringIntoView();
+        FrameworkElement[] shellSections = [HotkeysSection, AppearanceSection, WidgetsSection];
+        var selectedIndex = Math.Max(0, Navigation.SelectedIndex);
+        for (var index = 0; index < shellSections.Length; index++)
+        {
+            shellSections[index].Visibility = ToVisibility(index == selectedIndex);
+        }
+
+        var selectedWidgetIndex = selectedIndex - shellSections.Length;
+        WidgetSections.Visibility = ToVisibility(selectedWidgetIndex >= 0);
+
+        // Item containers are only generated once the list has been laid out while visible.
+        WidgetSections.UpdateLayout();
+        for (var index = 0; index < WidgetSections.Items.Count; index++)
+        {
+            if (WidgetSections.ItemContainerGenerator.ContainerFromIndex(index) is FrameworkElement container)
+            {
+                container.Visibility = ToVisibility(index == selectedWidgetIndex);
+            }
+        }
     }
+
+    private static Visibility ToVisibility(bool isVisible) => isVisible ? Visibility.Visible : Visibility.Collapsed;
 }
