@@ -17,6 +17,8 @@ The section of a version becomes the text of its GitHub release and is what Meer
 - Meerkat can start when you sign in to Windows. Switch it on in the settings under *General*, the
   page formerly called *Appearance*.
 - Widgets can mark a warning as prominent, which shows it as a yellow card in the status bar.
+- The tabs of the panel can be dragged to change the order of the widgets, which the chips in the
+  status bar follow.
 
 ### Changed
 

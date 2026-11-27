@@ -51,6 +51,8 @@
             <Button Command="{Binding DataContext.SelectCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                     CommandParameter="{Binding}"
                     AutomationProperties.Name="{Binding Title}"
+                    ToolTip="Drag to change the order"
+                    ToolTipService.InitialShowDelay="900"
                     Cursor="Hand"
                     Focusable="False">
                 <Button.Template>
@@ -82,6 +84,12 @@
                         <ControlTemplate.Triggers>
                             <DataTrigger Binding="{Binding IsSelected}" Value="True">
                                 <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Overlay.Hover}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsDragging}" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Overlay.SurfaceRaised}" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource Overlay.Accent}" />
+                                <Setter TargetName="Chrome" Property="BorderThickness" Value="1" />
+                                <Setter TargetName="Chrome" Property="Padding" Value="0,8" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding Badge}" Value="Warning">
                                 <Setter TargetName="Badge" Property="Visibility" Value="Visible" />
@@ -143,7 +151,15 @@
             </Grid.ColumnDefinitions>
 
             <Border Grid.Column="0" BorderBrush="{StaticResource Overlay.Border}" BorderThickness="0,0,1,0" Padding="8,10,8,0">
-                <ItemsControl ItemsSource="{Binding Widgets}" ItemTemplate="{StaticResource RailEntry}" Focusable="False" />
+                <!-- The tabs can be dragged up and down to change their order. -->
+                <ItemsControl x:Name="Rail"
+                              ItemsSource="{Binding Widgets}"
+                              ItemTemplate="{StaticResource RailEntry}"
+                              Focusable="False"
+                              PreviewMouseLeftButtonDown="OnRailMouseDown"
+                              PreviewMouseMove="OnRailMouseMove"
+                              PreviewMouseLeftButtonUp="OnRailMouseUp"
+                              LostMouseCapture="OnRailLostMouseCapture" />
             </Border>
 
             <DockPanel Grid.Column="1" Margin="18,14,18,16">

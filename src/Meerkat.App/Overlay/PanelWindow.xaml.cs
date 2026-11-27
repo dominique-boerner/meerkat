@@ -22,6 +22,9 @@ public partial class PanelWindow : Window
     private int _resizeStartCursor;
     private double _resizeStartWidth;
 
+    private WidgetEntryViewModel? _dragCandidate;
+    private Point _dragStart;
+
     public PanelWindow()
     {
         InitializeComponent();
@@ -107,6 +110,77 @@ public partial class PanelWindow : Window
             e.Handled = true;
             Dismissed?.Invoke(this, EventArgs.Empty);
         }
+    }
+
+    // A tab is a button: a click selects the widget. Pressing and moving it drags it to a new place instead;
+    // taking the mouse capture away from the button is what keeps the drag from ending in a click.
+    private void OnRailMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        _dragCandidate = (e.OriginalSource as FrameworkElement)?.DataContext as WidgetEntryViewModel;
+        _dragStart = e.GetPosition(Rail);
+    }
+
+    private void OnRailMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_dragCandidate is not { } entry || e.LeftButton != MouseButtonState.Pressed || DataContext is not PanelViewModel viewModel)
+        {
+            return;
+        }
+
+        var position = e.GetPosition(Rail);
+        if (!entry.IsDragging)
+        {
+            if (Math.Abs(position.Y - _dragStart.Y) < SystemParameters.MinimumVerticalDragDistance)
+            {
+                return;
+            }
+
+            Rail.CaptureMouse();
+            entry.IsDragging = true;
+        }
+
+        // The tab moves to the place of the one the pointer is over; the others make room right away.
+        for (var index = 0; index < Rail.Items.Count; index++)
+        {
+            if (Rail.ItemContainerGenerator.ContainerFromIndex(index) is FrameworkElement container)
+            {
+                var top = container.TranslatePoint(default, Rail).Y;
+                if (position.Y >= top && position.Y < top + container.ActualHeight)
+                {
+                    viewModel.MoveWidget(entry, index);
+                    break;
+                }
+            }
+        }
+    }
+
+    private void OnRailMouseUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_dragCandidate is { IsDragging: true })
+        {
+            e.Handled = true;
+            Rail.ReleaseMouseCapture();
+        }
+
+        _dragCandidate = null;
+    }
+
+    // Also reached when the drag is cut short, for example by switching to another window. The event of the
+    // button, which loses the capture to the rail when the drag starts, passes through here too and is ignored.
+    private void OnRailLostMouseCapture(object sender, MouseEventArgs e)
+    {
+        if (e.OriginalSource != Rail)
+        {
+            return;
+        }
+
+        if (_dragCandidate is { IsDragging: true } entry)
+        {
+            entry.IsDragging = false;
+            (DataContext as PanelViewModel)?.CommitOrder();
+        }
+
+        _dragCandidate = null;
     }
 
     private void OnResizeStarted(object sender, DragStartedEventArgs e)

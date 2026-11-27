@@ -29,6 +29,10 @@ public sealed partial class WidgetEntryViewModel(string id, string title, string
     [ObservableProperty]
     private WidgetSeverity _badge;
 
+    /// <summary>True while the user drags the tab to a new place in the rail.</summary>
+    [ObservableProperty]
+    private bool _isDragging;
+
     public string Id { get; } = id;
 
     public string Title { get; } = title;
@@ -48,6 +52,9 @@ public sealed partial class PanelViewModel : ObservableObject
 
     public event EventHandler? SettingsRequested;
 
+    /// <summary>Raised when the user has finished moving a tab, so that the new order can be kept.</summary>
+    public event EventHandler? OrderChanged;
+
     /// <summary>Backs the update card; null where no update support is wired up.</summary>
     public UpdateViewModel? Update { get; init; }
 
@@ -61,6 +68,22 @@ public sealed partial class PanelViewModel : ObservableObject
             Select(widget);
         }
     }
+
+    /// <summary>Moves a tab to another place in the rail. Returns false if it already is there.</summary>
+    public bool MoveWidget(WidgetEntryViewModel widget, int index)
+    {
+        var current = Widgets.IndexOf(widget);
+        index = Math.Clamp(index, 0, Math.Max(0, Widgets.Count - 1));
+        if (current < 0 || current == index)
+        {
+            return false;
+        }
+
+        Widgets.Move(current, index);
+        return true;
+    }
+
+    public void CommitOrder() => OrderChanged?.Invoke(this, EventArgs.Empty);
 
     public void RemoveWidget(WidgetEntryViewModel widget)
     {

@@ -38,6 +38,9 @@ public sealed class OverlaySettings
 
     public List<string> DisabledWidgets { get; set; } = [];
 
+    /// <summary>Ids of the widgets in the order the user arranged their tabs; widgets not listed follow in their built-in order.</summary>
+    public List<string> WidgetOrder { get; set; } = [];
+
     public UpdateSettings Updates { get; set; } = new();
 
     public Dictionary<string, JsonElement> WidgetSettings { get; set; } = [];

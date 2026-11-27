@@ -173,6 +173,34 @@ public class ShellViewModelTests
     }
 
     [Fact]
+    public void Panel_MovesTabsAndAnnouncesTheNewOrderOnlyWhenAsked()
+    {
+        var panel = new PanelViewModel();
+        var docker = new WidgetEntryViewModel("docker", "Docker", "D");
+        var git = new WidgetEntryViewModel("git", "Git", "G");
+        var notes = new WidgetEntryViewModel("notes", "Notes", "N");
+        panel.AddWidget(docker);
+        panel.AddWidget(git);
+        panel.AddWidget(notes);
+        var orderChanges = 0;
+        panel.OrderChanged += (_, _) => orderChanges++;
+
+        Assert.True(panel.MoveWidget(notes, 0));
+        Assert.False(panel.MoveWidget(notes, 0));
+        Assert.True(panel.MoveWidget(docker, 99));
+        Assert.False(panel.MoveWidget(new WidgetEntryViewModel("other", "Other", "O"), 0));
+
+        Assert.Equal(["notes", "git", "docker"], panel.Widgets.Select(widget => widget.Id));
+
+        // Moving does not change which widget is shown, and nothing is saved while the drag is going on.
+        Assert.Same(docker, panel.SelectedWidget);
+        Assert.Equal(0, orderChanges);
+
+        panel.CommitOrder();
+        Assert.Equal(1, orderChanges);
+    }
+
+    [Fact]
     public void Panel_RaisesCloseAndSettingsRequests()
     {
         var panel = new PanelViewModel();

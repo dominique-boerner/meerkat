@@ -111,7 +111,8 @@ that on in the settings under *General*.
 | Add a task | `Ctrl+Alt+T` |
 
 Click the status bar to open or close the panel, or click a card to open the panel on the page it
-belongs to. Drag the status bar by the handle at its end to move it, for example away from the buttons of maximized windows;
+belongs to. Drag the tabs of the panel up or down to change the order of the widgets; the chips in
+the status bar follow it. Drag the status bar by the handle at its end to move it, for example away from the buttons of maximized windows;
 its place is remembered relative to the screen, so it is the same on every monitor and resolution.
 The panel stays open while you work in other windows. It closes when you press `Esc` inside it,
 press the hotkey again or use its close button. Drag its left edge to change the width, for example to read long log

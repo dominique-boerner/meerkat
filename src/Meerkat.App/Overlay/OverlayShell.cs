@@ -77,6 +77,9 @@ public sealed class OverlayShell(
             RegisterWidget(widget);
         }
 
+        ApplyWidgetOrder(settings.Current.WidgetOrder);
+        panel.OrderChanged += (_, _) => SaveWidgetOrder();
+
         ApplySettings();
         _statusBarWindow.Show();
 
@@ -130,6 +133,13 @@ public sealed class OverlayShell(
                 await StopWidgetAsync(hosted);
                 panel.RemoveWidget(hosted.Entry);
             }
+        }
+
+        // A widget that was just enabled is added at the end; it belongs where the user arranged it.
+        var activeEntries = _hostedWidgets.Where(hosted => hosted.IsActive).Select(hosted => hosted.Entry).ToList();
+        for (var index = 0; index < activeEntries.Count; index++)
+        {
+            panel.MoveWidget(activeEntries[index], index);
         }
 
         // Only running widgets answer their hotkeys.
@@ -279,6 +289,35 @@ public sealed class OverlayShell(
         {
             errorLog.Write("Saving the panel width failed", exception);
         }
+    }
+
+    /// <summary>Arranges the widgets as listed; those not listed keep their relative order behind the others.</summary>
+    private void ApplyWidgetOrder(IReadOnlyList<string> order)
+    {
+        var position = order.Select((id, index) => (id, index)).ToDictionary(entry => entry.id, entry => entry.index);
+
+        // OrderBy is stable, which keeps the built-in order for widgets the user never moved.
+        var ordered = _hostedWidgets.OrderBy(hosted => position.GetValueOrDefault(hosted.Entry.Id, int.MaxValue)).ToList();
+        _hostedWidgets.Clear();
+        _hostedWidgets.AddRange(ordered);
+    }
+
+    /// <summary>Takes over the order of the tabs in the panel; the chips in the status bar follow it.</summary>
+    private void SaveWidgetOrder()
+    {
+        // Disabled widgets have no tab; they keep their place relative to each other behind the visible ones.
+        ApplyWidgetOrder([.. panel.Widgets.Select(entry => entry.Id)]);
+        settings.Current.WidgetOrder = [.. _hostedWidgets.Select(hosted => hosted.Entry.Id)];
+        try
+        {
+            settings.Save();
+        }
+        catch (Exception exception)
+        {
+            errorLog.Write("Saving the widget order failed", exception);
+        }
+
+        RefreshStatus();
     }
 
     private void SaveStatusBarPosition(double x, double y)
