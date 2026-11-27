@@ -4,4 +4,7 @@ namespace Meerkat.Abstractions;
 public interface IOverlayCommands
 {
     void OpenSettings();
+
+    /// <summary>Opens a web address in the user's browser. Anything but http and https is ignored.</summary>
+    void OpenUrl(Uri url);
 }

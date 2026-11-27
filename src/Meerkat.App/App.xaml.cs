@@ -7,7 +7,9 @@ using Meerkat.App.Overlay;
 using Meerkat.App.Settings;
 using Meerkat.App.Tray;
 using Meerkat.App.Updates;
+using Meerkat.App.Security;
 using Meerkat.Widgets.Docker;
+using Meerkat.Widgets.Git;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Meerkat.App;
@@ -100,7 +102,10 @@ public partial class App : Application
         services.AddSingleton<TrayIconService>();
         services.AddSingleton<OverlayShell>();
 
+        services.AddSingleton<IWidgetSecretStore>(_ => new CredentialManagerSecretStore());
+
         services.AddDockerWidget();
+        services.AddGitWidget();
 
         return services.BuildServiceProvider();
     }

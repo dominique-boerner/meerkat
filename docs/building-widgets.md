@@ -110,7 +110,8 @@ Request these through constructor injection.
 | `IOverlayState` | Read whether the overlay is visible, which mode is active and whether the shell has a notice to show, and react to changes through `Changed`. |
 | `IWidgetSettingsStore` | Load and save a settings object for your widget. It is stored as JSON in the user's settings file. |
 | `IOverlayPanelHost` | Show an additional, independently movable panel such as a log viewer. Dispose the returned handle to close it. |
-| `IOverlayCommands` | Ask the shell to open the settings window. |
+| `IWidgetSecretStore` | Keep secrets such as access tokens in the Windows Credential Manager instead of the settings file. |
+| `IOverlayCommands` | Ask the shell to open the settings window or a web address in the browser. |
 
 ## Behaving well on the overlay
 
@@ -169,8 +170,12 @@ Commonly used keys:
 
 The widget frame, background and header are drawn by the shell; your view only provides the content.
 
-## Reference implementation
+## Reference implementations
 
-`src/Meerkat.Widgets.Docker` is a complete widget that uses everything described here: a header
+`src/Meerkat.Widgets.Docker` is a complete widget that uses most of what is described here: a header
 view, a settings page, a secondary panel for logs, polling that pauses while hidden, and view models
 covered by unit tests.
+
+`src/Meerkat.Widgets.Git` shows how to talk to a web API: two providers behind one interface, a token
+kept in the secret store, error states for expired tokens and rate limits, and tests that replace the
+HTTP layer with canned responses.

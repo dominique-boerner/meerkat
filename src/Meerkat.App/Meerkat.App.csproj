@@ -24,6 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Meerkat.Abstractions\Meerkat.Abstractions.csproj" />
     <ProjectReference Include="..\Meerkat.Widgets.Docker\Meerkat.Widgets.Docker.csproj" />
+    <ProjectReference Include="..\Meerkat.Widgets.Git\Meerkat.Widgets.Git.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />

@@ -1,0 +1,482 @@
+<UserControl x:Class="Meerkat.Widgets.Git.Views.GitWidgetView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Root"
+             Foreground="{DynamicResource Overlay.Text}"
+             FontSize="12">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <SolidColorBrush x:Key="DangerSurface" Color="#24FF6B6B" />
+        <SolidColorBrush x:Key="SuccessSurface" Color="#1F3FCF8E" />
+        <SolidColorBrush x:Key="AccentSurface" Color="#225BB6FF" />
+
+        <Style x:Key="LinkButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Foreground" Value="{DynamicResource Overlay.Accent}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <TextBlock Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}" TextDecorations="Underline" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Round status badge; expects a PipelineStatus as content. -->
+        <DataTemplate x:Key="StatusBadge">
+            <Grid Width="16" Height="16">
+                <Ellipse x:Name="Circle" Fill="{DynamicResource Overlay.TextMuted}" />
+                <TextBlock x:Name="Glyph"
+                           Text="&#xE769;"
+                           FontFamily="{DynamicResource Overlay.IconFont}"
+                           FontSize="8"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource Overlay.SurfaceSolid}"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
+                <Ellipse x:Name="RunningDot"
+                         Width="5"
+                         Height="5"
+                         Fill="{DynamicResource Overlay.SurfaceSolid}"
+                         Visibility="Collapsed" />
+            </Grid>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding}" Value="Success">
+                    <Setter TargetName="Circle" Property="Fill" Value="{DynamicResource Overlay.Success}" />
+                    <Setter TargetName="Glyph" Property="Text" Value="&#xE73E;" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding}" Value="Failed">
+                    <Setter TargetName="Circle" Property="Fill" Value="{DynamicResource Overlay.Danger}" />
+                    <Setter TargetName="Glyph" Property="Text" Value="&#xE711;" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding}" Value="Running">
+                    <Setter TargetName="Circle" Property="Fill" Value="{DynamicResource Overlay.Accent}" />
+                    <Setter TargetName="Glyph" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="RunningDot" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding}" Value="Canceled">
+                    <Setter TargetName="Glyph" Property="Text" Value="&#xE738;" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <!-- Status text colored like its badge. -->
+        <Style x:Key="StatusText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Overlay.Text}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Status}" Value="Success">
+                    <Setter Property="Foreground" Value="{DynamicResource Overlay.Success}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="Failed">
+                    <Setter Property="Foreground" Value="{DynamicResource Overlay.Danger}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="Running">
+                    <Setter Property="Foreground" Value="{DynamicResource Overlay.Accent}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <DataTemplate x:Key="StageChip">
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                <TextBlock x:Name="Arrow"
+                           Text="→"
+                           Margin="7,0"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource Overlay.TextMuted}" />
+                <Border x:Name="Chip"
+                        CornerRadius="10"
+                        Padding="8,2"
+                        BorderThickness="1"
+                        BorderBrush="{DynamicResource Overlay.Border}"
+                        Background="Transparent">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="Mark" Text="–" Margin="0,0,3,0" FontSize="10.5" Foreground="{DynamicResource Overlay.TextMuted}" />
+                        <TextBlock x:Name="StageName"
+                                   Text="{Binding Name}"
+                                   FontFamily="{DynamicResource Overlay.MonoFont}"
+                                   FontSize="10.5"
+                                   Foreground="{DynamicResource Overlay.TextMuted}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding RelativeSource={RelativeSource PreviousData}}" Value="{x:Null}">
+                    <Setter TargetName="Arrow" Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="Success">
+                    <Setter TargetName="Chip" Property="Background" Value="{StaticResource SuccessSurface}" />
+                    <Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource Overlay.Success}" />
+                    <Setter TargetName="Mark" Property="Text" Value="✓" />
+                    <Setter TargetName="Mark" Property="Foreground" Value="{DynamicResource Overlay.Success}" />
+                    <Setter TargetName="StageName" Property="Foreground" Value="{DynamicResource Overlay.Text}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="Failed">
+                    <Setter TargetName="Chip" Property="Background" Value="{StaticResource DangerSurface}" />
+                    <Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource Overlay.Danger}" />
+                    <Setter TargetName="Mark" Property="Text" Value="✕" />
+                    <Setter TargetName="Mark" Property="Foreground" Value="{DynamicResource Overlay.Danger}" />
+                    <Setter TargetName="StageName" Property="Foreground" Value="{DynamicResource Overlay.Text}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="Running">
+                    <Setter TargetName="Chip" Property="Background" Value="{StaticResource AccentSurface}" />
+                    <Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource Overlay.Accent}" />
+                    <Setter TargetName="Mark" Property="Text" Value="●" />
+                    <Setter TargetName="Mark" Property="Foreground" Value="{DynamicResource Overlay.Accent}" />
+                    <Setter TargetName="StageName" Property="Foreground" Value="{DynamicResource Overlay.Text}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="Waiting">
+                    <Setter TargetName="Mark" Property="Text" Value="‖" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <!-- Display mode: two compact lines per pipeline. -->
+        <DataTemplate x:Key="CompactPipelineRow">
+            <Grid Margin="6,5,4,5">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ContentControl Grid.Column="0"
+                                Content="{Binding Status}"
+                                ContentTemplate="{StaticResource StatusBadge}"
+                                Margin="0,0,10,0"
+                                VerticalAlignment="Center"
+                                Focusable="False" />
+                <StackPanel Grid.Column="1" Margin="0,0,10,0">
+                    <TextBlock Text="{Binding ProjectName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding RefText}"
+                               FontFamily="{DynamicResource Overlay.MonoFont}"
+                               FontSize="9.5"
+                               Foreground="{DynamicResource Overlay.TextMuted}"
+                               TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <TextBlock Style="{StaticResource StatusText}" Text="{Binding StatusText}" FontSize="11" HorizontalAlignment="Right" />
+                    <TextBlock Text="{Binding TimeText}"
+                               FontSize="9.5"
+                               Foreground="{DynamicResource Overlay.TextMuted}"
+                               HorizontalAlignment="Right" />
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+
+        <!-- Interactive mode: one line per pipeline, failed ones expanded with their stages and actions. -->
+        <DataTemplate x:Key="InteractivePipelineRow">
+            <StackPanel>
+                <Border Background="{StaticResource DangerSurface}"
+                        BorderBrush="{DynamicResource Overlay.Danger}"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="10,8"
+                        Margin="0,2,0,6"
+                        Visibility="{Binding IsFailed, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
+                                <Button Content="Open job log"
+                                        Command="{Binding DataContext.OpenUrlCommand, ElementName=Root}"
+                                        CommandParameter="{Binding JobLogUrl}" />
+                                <Button Content="Retry"
+                                        Margin="8,0,0,0"
+                                        Command="{Binding DataContext.RetryCommand, ElementName=Root}"
+                                        CommandParameter="{Binding}" />
+                            </StackPanel>
+                            <ContentControl DockPanel.Dock="Left"
+                                            Content="{Binding Status}"
+                                            ContentTemplate="{StaticResource StatusBadge}"
+                                            Margin="0,0,10,0"
+                                            VerticalAlignment="Center"
+                                            Focusable="False" />
+                            <StackPanel>
+                                <TextBlock TextTrimming="CharacterEllipsis">
+                                    <Run Text="{Binding ProjectName, Mode=OneWay}" FontWeight="SemiBold" />
+                                    <Run Text="·" />
+                                    <Run Text="{Binding RefText, Mode=OneWay}" FontFamily="{DynamicResource Overlay.MonoFont}" />
+                                </TextBlock>
+                                <TextBlock Text="{Binding DetailText}" FontSize="11" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </DockPanel>
+                        <ItemsControl ItemsSource="{Binding Stages}"
+                                      ItemTemplate="{StaticResource StageChip}"
+                                      Margin="0,8,0,0"
+                                      Focusable="False">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <Grid Margin="6,6,4,6" Visibility="{Binding IsNotFailed, Converter={StaticResource BoolToVisibility}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="150" />
+                        <ColumnDefinition Width="80" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ContentControl Grid.Column="0"
+                                    Content="{Binding Status}"
+                                    ContentTemplate="{StaticResource StatusBadge}"
+                                    Margin="0,0,10,0"
+                                    VerticalAlignment="Center"
+                                    Focusable="False" />
+                    <TextBlock Grid.Column="1" Margin="0,0,10,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+                        <Run Text="{Binding ProjectName, Mode=OneWay}" FontWeight="SemiBold" />
+                        <Run Text="{Binding RefText, Mode=OneWay}"
+                             FontFamily="{DynamicResource Overlay.MonoFont}"
+                             FontSize="10.5"
+                             Foreground="{DynamicResource Overlay.TextMuted}" />
+                    </TextBlock>
+                    <TextBlock Grid.Column="2" Style="{StaticResource StatusText}" Text="{Binding StatusText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="3" Text="{Binding TimeText}" Foreground="{DynamicResource Overlay.TextMuted}" VerticalAlignment="Center" />
+                    <Button Grid.Column="4"
+                            Style="{StaticResource LinkButton}"
+                            Content="Open"
+                            VerticalAlignment="Center"
+                            Command="{Binding DataContext.OpenUrlCommand, ElementName=Root}"
+                            CommandParameter="{Binding WebUrl}" />
+                </Grid>
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate x:Key="ChangeRequestRow">
+            <Grid Margin="6,6,4,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="80" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                    <TextBlock TextTrimming="CharacterEllipsis">
+                        <Run Text="{Binding Reference, Mode=OneWay}"
+                             FontFamily="{DynamicResource Overlay.MonoFont}"
+                             Foreground="{DynamicResource Overlay.TextMuted}" />
+                        <Run Text="{Binding Title, Mode=OneWay}" FontWeight="SemiBold" />
+                    </TextBlock>
+                    <TextBlock FontSize="10.5" Foreground="{DynamicResource Overlay.TextMuted}" TextTrimming="CharacterEllipsis">
+                        <Run Text="{Binding ProjectName, Mode=OneWay}" />
+                        <Run Text="·" />
+                        <Run Text="{Binding Author, Mode=OneWay}" />
+                    </TextBlock>
+                </StackPanel>
+                <TextBlock Grid.Column="1" Text="{Binding TimeText}" Foreground="{DynamicResource Overlay.TextMuted}" VerticalAlignment="Center" />
+                <Button Grid.Column="2"
+                        Style="{StaticResource LinkButton}"
+                        Content="Open"
+                        VerticalAlignment="Center"
+                        Visibility="{Binding DataContext.IsInteractive, ElementName=Root, Converter={StaticResource BoolToVisibility}}"
+                        Command="{Binding DataContext.OpenUrlCommand, ElementName=Root}"
+                        CommandParameter="{Binding WebUrl}" />
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="FailureCard">
+            <Border BorderBrush="{DynamicResource Overlay.Border}" BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="6,2,4,8">
+                <StackPanel>
+                    <DockPanel>
+                        <TextBlock x:Name="Icon"
+                                   DockPanel.Dock="Left"
+                                   Text="&#xEA39;"
+                                   FontFamily="{DynamicResource Overlay.IconFont}"
+                                   FontSize="13"
+                                   Foreground="{DynamicResource Overlay.Danger}"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0" />
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13" />
+                    </DockPanel>
+                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Margin="21,4,0,0" />
+                    <StackPanel x:Name="Actions" Orientation="Horizontal" Margin="21,10,0,0">
+                        <Button Style="{DynamicResource Overlay.PrimaryButton}"
+                                Content="Renew token"
+                                Margin="0,0,8,0"
+                                Command="{Binding DataContext.RenewTokenCommand, ElementName=Root}"
+                                Visibility="{Binding CanRenewToken, Converter={StaticResource BoolToVisibility}}" />
+                        <Button Content="Settings"
+                                Command="{Binding DataContext.OpenSettingsCommand, ElementName=Root}"
+                                Visibility="{Binding CanOpenSettings, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding Icon}" Value="Key">
+                    <Setter TargetName="Icon" Property="Text" Value="&#xE8D7;" />
+                    <Setter TargetName="Icon" Property="Foreground" Value="{DynamicResource Overlay.Warning}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Icon}" Value="Clock">
+                    <Setter TargetName="Icon" Property="Text" Value="&#xE823;" />
+                    <Setter TargetName="Icon" Property="Foreground" Value="{DynamicResource Overlay.TextMuted}" />
+                    <Setter TargetName="Actions" Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <DataTemplate x:Key="TabButton">
+            <Button Command="{Binding DataContext.SelectTabCommand, ElementName=Root}"
+                    CommandParameter="{Binding}"
+                    AutomationProperties.Name="{Binding Label}"
+                    Focusable="False"
+                    Cursor="Hand">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome" Background="Transparent" CornerRadius="5" Padding="10,5" Margin="0,0,4,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="Label" Text="{Binding Label}" FontWeight="SemiBold" Foreground="{DynamicResource Overlay.Text}" />
+                                <Border x:Name="Badge" Background="{DynamicResource Overlay.Border}" CornerRadius="8" Padding="6,0" Margin="7,1,0,0" MinWidth="18">
+                                    <TextBlock x:Name="BadgeText"
+                                               Text="{Binding Count}"
+                                               FontSize="10.5"
+                                               FontWeight="SemiBold"
+                                               HorizontalAlignment="Center"
+                                               Foreground="{DynamicResource Overlay.TextMuted}" />
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Overlay.Hover}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding NeedsAttention}" Value="True">
+                                <Setter TargetName="Badge" Property="Background" Value="{DynamicResource Overlay.Accent}" />
+                                <Setter TargetName="BadgeText" Property="Foreground" Value="{DynamicResource Overlay.OnAccent}" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <DockPanel>
+        <!-- Footer: only in display mode, where it replaces the tabs as the way to learn about reviews. -->
+        <Grid DockPanel.Dock="Bottom"
+              Margin="6,6,4,0"
+              Visibility="{Binding IsDisplayMode, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ReviewNotice}" Value="{x:Null}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+                <Ellipse Width="5" Height="5" Margin="0,1,6,0" Fill="{DynamicResource Overlay.Accent}" />
+                <TextBlock Text="{Binding ReviewNotice}" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Text="{Binding IntervalText}" FontSize="10" HorizontalAlignment="Right">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource Overlay.Hint}">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ShellNotice}" Value="{x:Null}">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+            <TextBlock Text="{Binding ShellNotice}"
+                       FontSize="10"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource Overlay.Accent}"
+                       HorizontalAlignment="Right"
+                       VerticalAlignment="Center" />
+        </Grid>
+
+        <TextBlock DockPanel.Dock="Bottom"
+                   Text="{Binding ActionError}"
+                   Foreground="{DynamicResource Overlay.Danger}"
+                   FontSize="11"
+                   TextWrapping="Wrap"
+                   Margin="6,4,4,0">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ActionError}" Value="{x:Null}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+
+        <ContentControl DockPanel.Dock="Top" Content="{Binding Failure}" ContentTemplate="{StaticResource FailureCard}" Focusable="False">
+            <ContentControl.Style>
+                <!-- A content template is applied even to null content, so the card must be hidden explicitly. -->
+                <Style TargetType="ContentControl">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Failure}" Value="{x:Null}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </ContentControl.Style>
+        </ContentControl>
+
+        <!-- Tabs: only clickable, and therefore only shown, in interactive mode. -->
+        <ItemsControl DockPanel.Dock="Top"
+                      ItemsSource="{Binding Tabs}"
+                      ItemTemplate="{StaticResource TabButton}"
+                      Margin="2,0,0,6"
+                      Focusable="False"
+                      Visibility="{Binding IsInteractive, Converter={StaticResource BoolToVisibility}}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+        </ItemsControl>
+
+        <Grid>
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Style.Triggers>
+                        <!-- Data that could not be refreshed stays visible but is marked as possibly outdated. -->
+                        <DataTrigger Binding="{Binding IsStale}" Value="True">
+                            <Setter Property="Opacity" Value="0.45" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Focusable="False"
+                          Visibility="{Binding ShowPipelines, Converter={StaticResource BoolToVisibility}}">
+                <ItemsControl ItemsSource="{Binding Pipelines}" Focusable="False">
+                    <ItemsControl.Style>
+                        <Style TargetType="ItemsControl">
+                            <Setter Property="ItemTemplate" Value="{StaticResource CompactPipelineRow}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsInteractive}" Value="True">
+                                    <Setter Property="ItemTemplate" Value="{StaticResource InteractivePipelineRow}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ItemsControl.Style>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Focusable="False"
+                          Visibility="{Binding ShowReviewRequests, Converter={StaticResource BoolToVisibility}}">
+                <ItemsControl ItemsSource="{Binding ReviewRequests}" ItemTemplate="{StaticResource ChangeRequestRow}" Focusable="False" />
+            </ScrollViewer>
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Focusable="False"
+                          Visibility="{Binding ShowMyChangeRequests, Converter={StaticResource BoolToVisibility}}">
+                <ItemsControl ItemsSource="{Binding MyChangeRequests}" ItemTemplate="{StaticResource ChangeRequestRow}" Focusable="False" />
+            </ScrollViewer>
+        </Grid>
+    </DockPanel>
+</UserControl>

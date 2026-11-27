@@ -37,6 +37,15 @@ running inside WSL.
 - Polling pauses while the overlay is hidden
 - Dedicated error states when WSL, the Docker daemon or the Docker CLI is unavailable
 
+**Git widget**
+
+- Shows the pipelines of your GitLab projects or the workflow runs of your GitHub repositories,
+  one row per branch, with status and age
+- Explains failed runs with their stages, a link to the job log and a retry button
+- Lists merge or pull requests waiting for your review and the ones you opened
+- One layout for both providers; only the vocabulary changes
+- Keeps the last data visible when the token expires or a rate limit is hit, and says so
+
 ## Requirements
 
 | | |
@@ -44,6 +53,7 @@ running inside WSL.
 | Operating system | Windows 10 or 11, x64 |
 | Runtime | [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) (not needed for the self-contained download) |
 | Docker widget | WSL 2 with Docker Engine installed **inside** a distribution. Docker Desktop is not required. |
+| Git widget | A personal access token for GitLab (gitlab.com or self-managed) or GitHub (github.com or Enterprise Server) |
 
 ## Installation
 
@@ -84,8 +94,8 @@ SHA-256 checksum. Nothing is installed without your consent:
 - The *Updates* page of the settings shows the release notes and lets you turn off the automatic
   check or the background download and switch to the pre-release channel.
 
-The update check is the only network request Meerkat makes on its own. It contacts `api.github.com`
-and `github.com` and sends no data besides the request itself. Updating requires write access to the
+The update check contacts `api.github.com` and `github.com` and sends no data besides the request
+itself. Apart from it, Meerkat only uses the network for the Git widget once you have configured it. Updating requires write access to the
 folder `Meerkat.exe` is in, and is only available in the published single-file builds.
 
 ### Docker widget
@@ -94,6 +104,22 @@ The widget talks to Docker exclusively through `wsl.exe`, for example
 `wsl -d <distribution> --exec docker ps -a --format json`. Select the distribution in the settings;
 by default the WSL default distribution is used. The user Meerkat runs the commands as must be
 allowed to use Docker without `sudo`.
+
+### Git widget
+
+Open the settings, choose *Git*, pick the provider and enter a personal access token:
+
+| Provider | Token | Needed for |
+|---|---|---|
+| GitLab | Scope `read_api` | Everything except retrying pipelines, which needs `api` |
+| GitHub | Classic token with scopes `repo` and `workflow` | Private repositories and re-running failed jobs |
+
+*Test connection* signs in and loads your projects; tick the ones to watch. For a self-managed
+GitLab or GitHub Enterprise Server, enter its address as server URL. Only `https` addresses are
+accepted, because the token is sent with every request.
+
+The token is stored in the Windows Credential Manager under `Meerkat:git/...`, never in
+`settings.json`. The widget only talks to the server you configured.
 
 ## Building from source
 
@@ -114,6 +140,7 @@ dotnet run --project src/Meerkat.App
 | `src/Meerkat.App` | The overlay shell: window, hotkeys, tray icon, settings, widget hosting |
 | `src/Meerkat.Abstractions` | Contracts and shared visual theme for widgets |
 | `src/Meerkat.Widgets.Docker` | The Docker widget |
+| `src/Meerkat.Widgets.Git` | The Git widget for GitLab and GitHub |
 | `tests/Meerkat.Tests` | Unit tests (xUnit) |
 
 ### Test environment for the Docker widget
@@ -127,6 +154,12 @@ Docker Engine and a few demo containers:
 
 Afterwards select the distribution `Meerkat` in the Docker widget settings. Remove it again with
 `wsl --unregister Meerkat`.
+
+### Demo data for the Git widget
+
+Set the environment variable `MEERKAT_GIT_DEMO=1` before starting Meerkat to fill the Git widget with
+made-up pipelines and reviews. No account and no network access are needed, which helps when working
+on the layout or taking screenshots.
 
 ## Writing widgets
 

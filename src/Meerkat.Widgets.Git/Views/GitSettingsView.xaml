@@ -1,0 +1,90 @@
+<UserControl x:Class="Meerkat.Widgets.Git.Views.GitSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="24" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <StackPanel Grid.Column="0">
+            <TextBlock Style="{DynamicResource Overlay.FormLabel}" Text="Provider" />
+            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                <RadioButton Style="{DynamicResource Overlay.Chip}" Content="GitLab" GroupName="GitProvider" IsChecked="{Binding IsGitLab}" />
+                <RadioButton Style="{DynamicResource Overlay.Chip}" Content="GitHub" GroupName="GitProvider" IsChecked="{Binding IsGitHub}" Margin="4,0,0,0" />
+            </StackPanel>
+
+            <TextBlock Style="{DynamicResource Overlay.FormLabel}" Text="{Binding TokenLabel}" TextWrapping="Wrap" Margin="0,16,0,0" />
+            <DockPanel Margin="0,6,0,0">
+                <Button DockPanel.Dock="Right" Content="Test connection" Margin="8,0,0,0" Command="{Binding TestConnectionCommand}" />
+                <PasswordBox x:Name="TokenBox" PasswordChanged="OnTokenChanged" />
+            </DockPanel>
+            <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,6,0,0" Text="{Binding ConnectionStatus}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="{DynamicResource Overlay.Text}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsConnectionError}" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource Overlay.Danger}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding ConnectionStatus}" Value="">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+            <TextBlock Style="{DynamicResource Overlay.Hint}"
+                       TextWrapping="Wrap"
+                       TextTrimming="None"
+                       Margin="0,6,0,0"
+                       Text="Stored in the Windows Credential Manager, not in the JSON file." />
+
+            <CheckBox Margin="0,16,0,0" Content="{Binding OnlyMineLabel}" IsChecked="{Binding OnlyMyBranches}" />
+        </StackPanel>
+
+        <StackPanel Grid.Column="2">
+            <TextBlock Style="{DynamicResource Overlay.FormLabel}" Text="Server URL" />
+            <TextBox Margin="0,6,0,0" Text="{Binding ServerUrl, UpdateSourceTrigger=PropertyChanged}" />
+
+            <TextBlock Style="{DynamicResource Overlay.FormLabel}" Text="{Binding ProjectsLabel}" Margin="0,16,0,0" />
+            <Border Height="96"
+                    Margin="0,6,0,0"
+                    Padding="8,4"
+                    CornerRadius="4"
+                    BorderThickness="1"
+                    BorderBrush="{DynamicResource Overlay.Border}">
+                <Grid>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+                        <ItemsControl ItemsSource="{Binding Projects}" Focusable="False">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <CheckBox Margin="0,4" Content="{Binding Project.Name}" IsChecked="{Binding IsSelected}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    <TextBlock TextWrapping="Wrap" TextTrimming="None" VerticalAlignment="Center" Text="Test the connection to load the list.">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource Overlay.Hint}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Projects.Count}" Value="0">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+            </Border>
+
+            <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                <TextBlock Style="{DynamicResource Overlay.FormLabel}" Text="Interval" Margin="0,0,12,0" />
+                <TextBox Width="70" FontFamily="{DynamicResource Overlay.MonoFont}" Text="{Binding IntervalSeconds}" />
+                <TextBlock Style="{DynamicResource Overlay.Hint}" Text="seconds" Margin="8,0,0,0" />
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</UserControl>

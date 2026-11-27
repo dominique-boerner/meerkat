@@ -9,6 +9,14 @@ The section of a version becomes the text of its GitHub release and is what Meer
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-27
+
+### Added
+
+- Git widget for GitLab and GitHub: pipelines or workflow runs per branch, failed runs with their
+  stages, job log and retry, and the merge or pull requests waiting for your review.
+- Access tokens are stored in the Windows Credential Manager, not in the settings file.
+
 ## [1.1.0] - 2026-11-27
 
 ### Added

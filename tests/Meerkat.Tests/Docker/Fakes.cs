@@ -59,7 +59,11 @@ internal sealed class FakeOverlayCommands : IOverlayCommands
 {
     public int OpenSettingsCalls { get; private set; }
 
+    public List<Uri> OpenedUrls { get; } = [];
+
     public void OpenSettings() => OpenSettingsCalls++;
+
+    public void OpenUrl(Uri url) => OpenedUrls.Add(url);
 }
 
 internal sealed class InMemoryWidgetSettingsStore : IWidgetSettingsStore
