@@ -17,6 +17,7 @@ public sealed class ServicesWidget(ServicesWidgetViewModel viewModel, ServicesSe
     public const string WidgetId = "services";
 
     private ServicesWidgetView? _view;
+    private ServicesHeaderView? _headerView;
 
     public event EventHandler? StatusChanged
     {
@@ -31,6 +32,8 @@ public sealed class ServicesWidget(ServicesWidgetViewModel viewModel, ServicesSe
     public string Icon => "";
 
     public FrameworkElement View => _view ??= new ServicesWidgetView { DataContext = viewModel };
+
+    public FrameworkElement HeaderView => _headerView ??= new ServicesHeaderView { DataContext = viewModel };
 
     public IWidgetSettingsPage SettingsPage => settingsPage;
 

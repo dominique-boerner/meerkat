@@ -26,8 +26,9 @@ public sealed partial class ServicesWidgetViewModel(
     [ObservableProperty]
     private bool _isEmpty = true;
 
+    /// <summary>How many services are watched, for the heading of the page.</summary>
     [ObservableProperty]
-    private string _heading = "EXTERNAL SERVICES";
+    private string _summary = string.Empty;
 
     public event EventHandler? StatusChanged;
 
@@ -110,6 +111,9 @@ public sealed partial class ServicesWidgetViewModel(
     }
 
     [RelayCommand]
+    private Task RefreshAsync() => Task.WhenAll(Services.ToList().Select(RecheckAsync));
+
+    [RelayCommand]
     private void ToggleMute(ServiceViewModel service)
     {
         service.SetMuted(!service.IsMuted);
@@ -134,7 +138,7 @@ public sealed partial class ServicesWidgetViewModel(
         }
 
         IsEmpty = Services.Count == 0;
-        Heading = IsEmpty ? "EXTERNAL SERVICES" : $"EXTERNAL SERVICES · {Services.Count}";
+        Summary = Services.Count == 1 ? "1 service" : $"{Services.Count} services";
         UpdateStatus();
 
         _servicesCancellation = CancellationTokenSource.CreateLinkedTokenSource(_cancellation?.Token ?? CancellationToken.None);

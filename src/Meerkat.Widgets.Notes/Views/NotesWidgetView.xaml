@@ -266,8 +266,6 @@
                         </Button>
                         <Button Style="{DynamicResource Overlay.IconButton}" Content="&#xE8A7;" Padding="8,6" FontSize="12"
                                 ToolTip="Open in the default editor" Command="{Binding OpenExternallyCommand}" />
-                        <Button Style="{DynamicResource Overlay.IconButton}" Content="&#xE8B7;" Padding="8,6" FontSize="12"
-                                ToolTip="Open the notes folder" Command="{Binding OpenFolderCommand}" />
                         <Button Content="&#xE74D;" Padding="8,6" FontSize="12"
                                 ToolTip="Move this note to the recycle bin" Command="{Binding DeleteNoteCommand}">
                             <Button.Style>

@@ -29,6 +29,7 @@ public sealed partial class NotesWidgetViewModel : ObservableObject
     private readonly INoteStore _store;
     private readonly NotesSettingsSource _settings;
     private readonly TimeProvider _time;
+    private readonly IOverlayCommands? _commands;
 
     private SynchronizationContext? _context;
     private ITimer? _timer;
@@ -60,11 +61,17 @@ public sealed partial class NotesWidgetViewModel : ObservableObject
     [ObservableProperty]
     private bool _isPinned;
 
-    public NotesWidgetViewModel(INoteStore store, NotesSettingsSource settings, TimeProvider time)
+    /// <summary>How many notes there are besides the scratchpad, for the heading of the page.</summary>
+    [ObservableProperty]
+    private string _summary = string.Empty;
+
+    /// <param name="commands">Lets the page open the settings; without it that button does nothing.</param>
+    public NotesWidgetViewModel(INoteStore store, NotesSettingsSource settings, TimeProvider time, IOverlayCommands? commands = null)
     {
         _store = store;
         _settings = settings;
         _time = time;
+        _commands = commands;
     }
 
     public event EventHandler? StatusChanged;
@@ -379,6 +386,9 @@ public sealed partial class NotesWidgetViewModel : ObservableObject
     [RelayCommand]
     private void OpenFolder() => Guard(_store.OpenFolder);
 
+    [RelayCommand]
+    private void OpenSettings() => _commands?.OpenSettings();
+
     public static string FormatDate(DateTime modified, DateTime now)
     {
         var days = (now.Date - modified.Date).Days;
@@ -539,6 +549,8 @@ public sealed partial class NotesWidgetViewModel : ObservableObject
         var now = _time.GetLocalNow().DateTime;
         var notes = _store.List();
         var scratchpad = notes.FirstOrDefault(note => IsName(note, ScratchpadName));
+        var count = notes.Count(note => !IsName(note, ScratchpadName) && !IsName(note, ArchiveName));
+        Summary = count == 1 ? "scratchpad and 1 note" : $"scratchpad and {count} notes";
         var items = new List<NoteListItemViewModel>
         {
             new(ScratchpadName, ScratchpadTitle, scratchpad is null ? "empty" : FormatDate(scratchpad.LastModified, now), IsScratchpad: true, _selectedName == ScratchpadName),

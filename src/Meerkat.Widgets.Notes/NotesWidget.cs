@@ -18,6 +18,7 @@ public sealed class NotesWidget(NotesWidgetViewModel viewModel, NotesSettingsPag
     public const string WidgetId = "notes";
 
     private NotesWidgetView? _view;
+    private NotesHeaderView? _headerView;
     private QuickCaptureWindow? _captureWindow;
 
     public event EventHandler? StatusChanged
@@ -33,6 +34,8 @@ public sealed class NotesWidget(NotesWidgetViewModel viewModel, NotesSettingsPag
     public string Icon => "";
 
     public FrameworkElement View => _view ??= new NotesWidgetView { DataContext = viewModel };
+
+    public FrameworkElement HeaderView => _headerView ??= new NotesHeaderView { DataContext = viewModel };
 
     public IWidgetSettingsPage SettingsPage => settingsPage;
 
@@ -80,7 +83,8 @@ public static class NotesWidgetServiceCollectionExtensions
         services.AddSingleton(provider => new NotesWidgetViewModel(
             provider.GetRequiredService<INoteStore>(),
             provider.GetRequiredService<NotesSettingsSource>(),
-            TimeProvider.System));
+            TimeProvider.System,
+            provider.GetRequiredService<IOverlayCommands>()));
         services.AddSingleton<NotesSettingsPage>();
         services.AddSingleton<IOverlayWidget, NotesWidget>();
         return services;

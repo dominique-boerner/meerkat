@@ -135,18 +135,8 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <DockPanel Margin="18,14,18,16">
-        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,10">
-            <Button DockPanel.Dock="Right"
-                    Style="{DynamicResource Overlay.IconButton}"
-                    Content="&#xE9E9;"
-                    Padding="8,6"
-                    FontSize="13"
-                    ToolTip="Add or change services"
-                    Command="{Binding OpenSettingsCommand}" />
-            <TextBlock Style="{DynamicResource Overlay.ColumnHeader}" FontSize="11" Text="{Binding Heading}" VerticalAlignment="Center" />
-        </DockPanel>
-
+    <!-- The heading with its buttons is the widget's header view, which the panel shows above this page. -->
+    <DockPanel>
         <StackPanel DockPanel.Dock="Top" Margin="0,24,0,0" HorizontalAlignment="Center" Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}">
             <TextBlock Text="No services yet" FontWeight="SemiBold" FontSize="14" HorizontalAlignment="Center" />
             <TextBlock Text="Add the status pages of the services your work depends on, such as your package registry or code hosting. Meerkat tells you when one of them reports trouble."
