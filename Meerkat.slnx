@@ -4,6 +4,7 @@
     <Project Path="src/Meerkat.App/Meerkat.App.csproj" />
     <Project Path="src/Meerkat.Widgets.Docker/Meerkat.Widgets.Docker.csproj" />
     <Project Path="src/Meerkat.Widgets.Git/Meerkat.Widgets.Git.csproj" />
+    <Project Path="src/Meerkat.Widgets.Server/Meerkat.Widgets.Server.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Meerkat.Tests/Meerkat.Tests.csproj" />

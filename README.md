@@ -15,8 +15,8 @@ every click passes straight through it, and as long as everything works it is on
 When something breaks, the status bar says what and since when. A global hotkey opens a side panel
 with the details and the actions to deal with it.
 
-Meerkat is a generic shell that hosts **widgets**. It ships with one for Docker containers running
-inside WSL and one for GitLab and GitHub.
+Meerkat is a generic shell that hosts **widgets**. It ships with widgets for Docker containers running
+inside WSL, for GitLab and GitHub, and for servers reachable over SSH.
 
 ## Features
 
@@ -51,6 +51,15 @@ inside WSL and one for GitLab and GitHub.
 - Reports failed pipelines as an error and waiting reviews as a hint
 - Keeps the last data visible when the token expires or a rate limit is hit, and says so
 
+**Server widget**
+
+- Monitors Linux machines over SSH: reachability, CPU with a 30-minute history, load, memory, disk
+  usage and the state of systemd services
+- Uses the OpenSSH client of Windows, so your `~/.ssh/config`, SSH agent and `known_hosts` apply
+- Reports unreachable hosts and nearly full disks, and refuses to connect when a host key changed
+  until you have verified the new one
+- Opens a terminal session on a host with one click
+
 ## Requirements
 
 | | |
@@ -59,6 +68,7 @@ inside WSL and one for GitLab and GitHub.
 | Runtime | [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) (not needed for the self-contained download) |
 | Docker widget | WSL 2 with Docker Engine installed **inside** a distribution. Docker Desktop is not required. |
 | Git widget | A personal access token for GitLab (gitlab.com or self-managed) or GitHub (github.com or Enterprise Server) |
+| Server widget | The OpenSSH client that ships with Windows (`ssh.exe`) and key-based access to the hosts; the hosts must run Linux |
 
 ## Installation
 
@@ -101,7 +111,8 @@ SHA-256 checksum. Nothing is installed without your consent:
   check or the background download and switch to the pre-release channel.
 
 The update check contacts `api.github.com` and `github.com` and sends no data besides the request
-itself. Apart from it, Meerkat only uses the network for the Git widget once you have configured it. Updating requires write access to the
+itself. Apart from it, Meerkat only uses the network for the Git and Server widgets once you have
+configured them, and only to reach the servers you entered. Updating requires write access to the
 folder `Meerkat.exe` is in, and is only available in the published single-file builds.
 
 ### Docker widget
@@ -127,6 +138,22 @@ accepted, because the token is sent with every request.
 The token is stored in the Windows Credential Manager under `Meerkat:git/...`, never in
 `settings.json`. The widget only talks to the server you configured.
 
+### Server widget
+
+Open the settings, choose *Server* and add a host. Hosts from your `~/.ssh/config` are offered by
+name; for others enter host name, user and port. Meerkat signs in with the keys your SSH agent or
+configuration provides, with a key file you pick, or with a password. A password is stored in the
+Windows Credential Manager under `Meerkat:server/...`, never in `settings.json`; where the host
+allows it, a key is the safer choice.
+
+*Connect and check* verifies the entries with a first connection. That is also the moment the host's
+key is stored in `known_hosts`. Afterwards Meerkat only connects while the key stays the same; if it
+changes, the host is blocked and the panel shows the new fingerprint for you to verify.
+
+Each check is a single SSH call that reads `/proc`, `df` and `systemctl is-active`. Nothing is
+installed or changed on the host. Per host you can list the systemd services to watch, set the check
+interval and the disk usage at which Meerkat shows a hint or an error.
+
 ## Building from source
 
 You need the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) or newer.
@@ -147,6 +174,7 @@ dotnet run --project src/Meerkat.App
 | `src/Meerkat.Abstractions` | Contracts and shared visual theme for widgets |
 | `src/Meerkat.Widgets.Docker` | The Docker widget |
 | `src/Meerkat.Widgets.Git` | The Git widget for GitLab and GitHub |
+| `src/Meerkat.Widgets.Server` | The Server widget for machines reachable over SSH |
 | `tests/Meerkat.Tests` | Unit tests (xUnit) |
 
 ### Test environment for the Docker widget

@@ -6,6 +6,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\meerkat-app.ico</ApplicationIcon>
+    <StartupObject>Meerkat.App.Program</StartupObject>
     <AssemblyName>Meerkat</AssemblyName>
     <!-- WFO0003 assumes a Windows Forms app; WPF needs the manifest for per-monitor DPI awareness. -->
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
@@ -25,6 +26,7 @@
     <ProjectReference Include="..\Meerkat.Abstractions\Meerkat.Abstractions.csproj" />
     <ProjectReference Include="..\Meerkat.Widgets.Docker\Meerkat.Widgets.Docker.csproj" />
     <ProjectReference Include="..\Meerkat.Widgets.Git\Meerkat.Widgets.Git.csproj" />
+    <ProjectReference Include="..\Meerkat.Widgets.Server\Meerkat.Widgets.Server.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />

@@ -236,3 +236,7 @@ and view models covered by unit tests.
 `src/Meerkat.Widgets.Git` shows how to talk to a web API: two providers behind one interface, a token
 kept in the secret store, error states for expired tokens and rate limits, and tests that replace the
 HTTP layer with canned responses.
+
+`src/Meerkat.Widgets.Server` monitors several independent targets: one polling loop per host with its
+own interval, alerts that keep the time a problem started, a list that sorts itself by severity, and
+a settings page with a list and an edit form.

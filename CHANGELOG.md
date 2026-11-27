@@ -9,6 +9,13 @@ The section of a version becomes the text of its GitHub release and is what Meer
 
 ## [Unreleased]
 
+### Added
+
+- Server widget: monitors Linux machines over SSH with reachability, CPU history, load, memory, disk
+  usage and systemd services. It uses the OpenSSH client of Windows, reports unreachable hosts and
+  nearly full disks, and blocks a host whose key changed until the new key has been verified. Hosts
+  sign in through the SSH agent, a key file or a password kept in the Windows Credential Manager.
+
 ## [1.3.0] - 2026-11-27
 
 ### Changed
