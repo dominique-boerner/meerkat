@@ -377,7 +377,10 @@ public sealed partial class SecurityViewModel(
                 worst.Max(finding => finding.FirstSeen),
 
                 // A grave vulnerability is news even when it is not critical: the user asked to be told.
-                Prominent: true));
+                Prominent: true,
+
+                // A shield: this is about security, not about whether Docker runs.
+                Icon: "\uEA18"));
         }
 
         alerts.AddRange(Sources

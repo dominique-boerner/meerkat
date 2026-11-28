@@ -55,8 +55,8 @@ public class ShellViewModelTests
         // Oldest problem first: it is the most likely cause of the ones that followed.
         Assert.Equal(
             [
-                new AlertCardViewModel("3 pipelines failed", "shop-core (2) · shop-portal (1)", "4 min ago"),
-                new AlertCardViewModel("Docker daemon is not running", "Ubuntu-24.04", "1 min ago"),
+                new AlertCardViewModel("3 pipelines failed", "shop-core (2) · shop-portal (1)", "4 min ago", Key: "|3 pipelines failed", Icon: "\uE7BA"),
+                new AlertCardViewModel("Docker daemon is not running", "Ubuntu-24.04", "1 min ago", Key: "|Docker daemon is not running", Icon: "\uE7BA"),
             ],
             statusBar.Alerts);
         Assert.Equal("+1", statusBar.MoreHintsCount);

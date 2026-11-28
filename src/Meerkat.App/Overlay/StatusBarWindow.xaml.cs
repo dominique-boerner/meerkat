@@ -2,6 +2,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Meerkat.App.Interop;
 
@@ -22,14 +24,24 @@ public partial class StatusBarWindow : Window
     private double _positionX = StatusBarPlacement.DefaultX;
     private double _positionY = StatusBarPlacement.DefaultY;
 
+    private static readonly TimeSpan FlyOutDuration = TimeSpan.FromMilliseconds(180);
+    private static readonly TimeSpan MenuCheckInterval = TimeSpan.FromMilliseconds(350);
+
     private Point? _dragStartCursor;
     private Point _dragStartBar;
     private bool _hasMoved;
+
+    private FrameworkElement? _menuCardElement;
+
+    private readonly DispatcherTimer _menuTimer;
+    private AlertCardViewModel? _menuCard;
+    private int _menuIdleChecks;
 
     public StatusBarWindow()
     {
         InitializeComponent();
         SizeChanged += (_, _) => ApplyPlacement();
+        _menuTimer = new DispatcherTimer(MenuCheckInterval, DispatcherPriority.Background, (_, _) => CloseMenuWhenLeft(), Dispatcher) { IsEnabled = false };
     }
 
     /// <summary>Raised when the user has dragged the bar by its handle to a new place, with the position as fractions of the screen.</summary>
@@ -103,6 +115,100 @@ public partial class StatusBarWindow : Window
         DockPanel.SetDock(Bar, dock);
         DockPanel.SetDock(CardsPanel, dock);
         CardsPanel.Margin = placement.GrowsUp ? new Thickness(0, -CardGap, 0, CardGap) : default;
+    }
+
+    private void OnDismissClick(object sender, RoutedEventArgs e)
+    {
+        // The button lies in the card it puts away.
+        if ((sender as FrameworkElement)?.Parent is FrameworkElement card)
+        {
+            FlyOut(card, viewModel => viewModel.DismissAlertCommand);
+        }
+    }
+
+    /// <summary>Lets a card leave to the right and puts it away once it is gone.</summary>
+    private void FlyOut(FrameworkElement card, Func<StatusBarViewModel, System.Windows.Input.ICommand> command)
+    {
+        if (card.DataContext is not AlertCardViewModel alert || DataContext is not StatusBarViewModel viewModel)
+        {
+            return;
+        }
+
+        // Out of reach while it leaves, so that a second click cannot put it away twice.
+        card.IsHitTestVisible = false;
+        var transform = new TranslateTransform();
+        card.RenderTransform = transform;
+        var slide = new DoubleAnimation(card.ActualWidth + 40, FlyOutDuration) { EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn } };
+        slide.Completed += (_, _) => command(viewModel).Execute(alert);
+        transform.BeginAnimation(TranslateTransform.XProperty, slide);
+        card.BeginAnimation(OpacityProperty, new DoubleAnimation(0, FlyOutDuration));
+    }
+
+    private void OnCardRightClick(object sender, MouseButtonEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not AlertCardViewModel card)
+        {
+            return;
+        }
+
+        _menuCard = card;
+        _menuCardElement = (FrameworkElement)sender;
+        _menuIdleChecks = 0;
+        CardMenu.IsOpen = false;
+        CardMenu.IsOpen = true;
+        _menuTimer.Start();
+        e.Handled = true;
+    }
+
+    private void OnCardMenuClick(object sender, RoutedEventArgs e)
+    {
+        var card = _menuCard;
+        var element = _menuCardElement;
+        CloseMenu();
+        if (card is null || element is null || DataContext is not StatusBarViewModel viewModel)
+        {
+            return;
+        }
+
+        switch ((sender as FrameworkElement)?.Tag)
+        {
+            case "Dismiss":
+                FlyOut(element, shown => shown.DismissAlertCommand);
+                break;
+            case "Hour":
+                FlyOut(element, shown => shown.MuteAlertForAnHourCommand);
+                break;
+            case "Tomorrow":
+                FlyOut(element, shown => shown.MuteAlertUntilTomorrowCommand);
+                break;
+            default:
+                viewModel.OpenAlertCommand.Execute(card);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// A menu normally closes when the user clicks elsewhere. This window never becomes the active one, so
+    /// it does not hear of clicks elsewhere; the menu closes once the pointer has left it and the cards instead.
+    /// </summary>
+    private void CloseMenuWhenLeft()
+    {
+        if (CardMenuContent.IsMouseOver || CardsPanel.IsMouseOver)
+        {
+            _menuIdleChecks = 0;
+        }
+        else if (++_menuIdleChecks >= 2)
+        {
+            CloseMenu();
+        }
+    }
+
+    private void CloseMenu()
+    {
+        _menuTimer.Stop();
+        _menuCard = null;
+        _menuCardElement = null;
+        CardMenu.IsOpen = false;
     }
 
     // Marking the press as handled keeps it from the bar, which would otherwise take it as the start of a click.

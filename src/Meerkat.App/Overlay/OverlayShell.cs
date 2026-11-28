@@ -65,6 +65,8 @@ public sealed class OverlayShell(
         panel.CloseRequested += (_, _) => SetPanelOpen(false);
         statusBar.PanelToggleRequested += (_, _) => TogglePanel();
         statusBar.WidgetRequested += (_, widgetId) => ShowWidget(widgetId);
+        statusBar.SetHiddenAlerts(settings.Current.HiddenAlerts);
+        statusBar.HiddenAlertsChanged += (_, _) => SaveHiddenAlerts();
         panel.SettingsRequested += (_, _) => OpenSettings();
         tray.ToggleVisibilityRequested += (_, _) => ToggleVisibility();
         tray.TogglePanelRequested += (_, _) => TogglePanel();
@@ -219,12 +221,13 @@ public sealed class OverlayShell(
             return new WidgetReport(
                 new WidgetStatus(hosted.Entry.Title, "–", WidgetSeverity.Error),
                 [new WidgetAlert(WidgetSeverity.Error, $"{hosted.Entry.Title} widget was suspended", failure.Detail, hosted.FailedSince)],
-                WidgetId: hosted.Entry.Id);
+                WidgetId: hosted.Entry.Id,
+                Icon: hosted.Entry.Icon);
         }
 
         try
         {
-            return new WidgetReport(hosted.Widget.Status, hosted.Widget.Alerts, hosted.Widget.StatusCard, hosted.Entry.Id, hosted.Widget.AdditionalStatuses);
+            return new WidgetReport(hosted.Widget.Status, hosted.Widget.Alerts, hosted.Widget.StatusCard, hosted.Entry.Id, hosted.Widget.AdditionalStatuses, hosted.Entry.Icon);
         }
         catch (Exception exception)
         {
@@ -450,10 +453,24 @@ public sealed class OverlayShell(
         }
     }
 
+    private void SaveHiddenAlerts()
+    {
+        settings.Current.HiddenAlerts = new Dictionary<string, DateTimeOffset?>(statusBar.HiddenAlerts);
+        try
+        {
+            settings.Save();
+        }
+        catch (Exception exception)
+        {
+            errorLog.Write("Remembering the cards that were put away failed", exception);
+        }
+    }
+
     /// <summary>Follows settings that were changed in the file instead of in the window.</summary>
     private async Task OnSettingsReloadedAsync()
     {
         ApplyWidgetOrder(settings.Current.WidgetOrder);
+        statusBar.SetHiddenAlerts(settings.Current.HiddenAlerts);
         ApplySettings();
         await SyncWidgetsAsync();
         updateViewModel.Refresh();

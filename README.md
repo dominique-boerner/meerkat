@@ -115,7 +115,10 @@ that on in the settings under *General*.
 | Add a task | `Ctrl+Alt+T` |
 
 Click the status bar to open or close the panel, or click a card to open the panel on the page it
-belongs to. Drag the tabs of the panel up or down to change the order of the widgets; the chips in
+belongs to. A card you have seen can be put away: click the cross that appears under the pointer,
+or right-click it to mute it for an hour or until tomorrow. It stays
+away until its alert is over or has something new to say. The chip in the bar keeps its colour
+meanwhile, as an outline: filled means news, outlined means known. Drag the tabs of the panel up or down to change the order of the widgets; the chips in
 the status bar follow it. Drag the status bar by the handle at its end to move it, for example away from the buttons of maximized windows;
 its place is remembered relative to the screen, so it is the same on every monitor and resolution.
 The panel stays open while you work in other windows. It closes when you press `Esc` inside it,

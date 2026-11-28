@@ -9,6 +9,21 @@ The section of a version becomes the text of its GitHub release and is what Meer
 
 ## [Unreleased]
 
+### Added
+
+- The cards below the status bar can be put away: with the cross that takes the place of the age
+  under the pointer, or through the menu of a right click, which also mutes a card for an hour or
+  until tomorrow. A card that was put away stays away, also across
+  restarts, until its alert is over or has something new to say.
+- The chip of a problem whose cards were put away keeps its colour but turns into an outline: filled
+  means news, outlined means known.
+- Widgets can give an alert an icon of its own.
+
+### Changed
+
+- A card shows a symbol for what it is about, such as a shield for vulnerabilities, in the colour of
+  its severity, instead of a cross that looked like a button to close it.
+
 ## [1.7.1] - 2026-11-28
 
 ### Fixed

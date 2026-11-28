@@ -115,7 +115,7 @@ public sealed class DiskWidget(IOverlayState overlayState) : IOverlayWidget
 | `HeaderView` | Optional content above the page, for example a summary and buttons. |
 | `Status` | The widget's chip in the status bar: a label, a compact figure and a severity. Return null while there is nothing to report. |
 | `AdditionalStatuses` | Further chips, shown right after `Status`. For the rare widget that watches two things worth telling apart at a glance, as the Docker widget does with containers and images. |
-| `Alerts` | Conditions that need attention right now. |
+| `Alerts` | Conditions that need attention right now. An alert may bring an `Icon` that tells what it is about; otherwise its card shows the icon of the widget. Keep the title stable while the alert says the same thing: a card the user put away returns when the title changes. |
 | `StatusCard` | Optional card below the status bar for something the user chose to keep in view, see [Status cards and hotkeys](#status-cards-and-hotkeys). |
 | `Hotkeys` | Optional global hotkeys, see [Status cards and hotkeys](#status-cards-and-hotkeys). |
 | `StatusChanged` | Raise it whenever `Status`, `AdditionalStatuses`, `Alerts` or `StatusCard` changed. It may be raised from any thread. |

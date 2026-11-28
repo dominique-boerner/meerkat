@@ -20,7 +20,11 @@ public sealed record WidgetStatus(string Label, string Summary, WidgetSeverity S
 /// Shows a warning as a card in the status bar, as errors always are. Meant for the rare warning that
 /// explains trouble the user is about to run into, such as a disturbance of a service they depend on.
 /// </param>
-public sealed record WidgetAlert(WidgetSeverity Severity, string Title, string Detail, DateTimeOffset Since, bool Prominent = false);
+/// <param name="Icon">
+/// A glyph from the Segoe Fluent Icons font that tells what the alert is about, where that is something
+/// else than the widget as a whole; null uses the icon of the widget.
+/// </param>
+public sealed record WidgetAlert(WidgetSeverity Severity, string Title, string Detail, DateTimeOffset Since, bool Prominent = false, string? Icon = null);
 
 /// <summary>
 /// Something the user chose to keep in view below the status bar, such as a task list. The status bar

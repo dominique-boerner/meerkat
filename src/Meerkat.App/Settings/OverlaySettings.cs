@@ -41,6 +41,12 @@ public sealed class OverlaySettings
     /// <summary>Ids of the widgets in the order the user arranged their tabs; widgets not listed follow in their built-in order.</summary>
     public List<string> WidgetOrder { get; set; } = [];
 
+    /// <summary>
+    /// Cards of the status bar the user put away, with the time they return on their own; null keeps a
+    /// card away until its alert is over or says something new.
+    /// </summary>
+    public Dictionary<string, DateTimeOffset?> HiddenAlerts { get; set; } = [];
+
     public UpdateSettings Updates { get; set; } = new();
 
     public Dictionary<string, JsonElement> WidgetSettings { get; set; } = [];
