@@ -9,6 +9,8 @@ The section of a version becomes the text of its GitHub release and is what Meer
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-11-28
+
 ### Added
 
 - Action search: `Ctrl+Alt+A` opens a search field above any window that finds what the widgets can
