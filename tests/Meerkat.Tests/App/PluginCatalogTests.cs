@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using Meerkat.Abstractions;
@@ -39,7 +40,10 @@ public sealed class PluginCatalogTests : IDisposable
 
         var plugin = Assert.Single(catalog.Plugins);
         Assert.Equal(SampleName, plugin.Name);
-        Assert.Equal("1.0.0", plugin.Version);
+        // What the assembly states about itself, whatever version this build was given.
+        var stated = FileVersionInfo.GetVersionInfo(Path.Combine(plugin.Directory, SampleName + ".dll")).ProductVersion;
+        Assert.Equal(stated?.Split('+')[0], plugin.Version);
+        Assert.NotNull(plugin.Version);
         Assert.Empty(plugin.Problems);
         Assert.Equal(["Disk"], plugin.Widgets);
         Assert.Equal("sample-disk", Assert.Single(widgets).Id);
