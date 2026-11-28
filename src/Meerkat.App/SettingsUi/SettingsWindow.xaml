@@ -384,6 +384,46 @@
                                             Command="{Binding OpenReleaseNotesCommand}" />
                                 </StackPanel>
                             </Grid>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,20,0,6">
+                                <TextBlock Style="{StaticResource GroupTitle}" Text="PLUGINS" />
+                                <ContentControl Style="{StaticResource Overlay.Info}" ToolTip="{Binding PluginInfo}" />
+                            </StackPanel>
+                            <ItemsControl ItemsSource="{Binding Plugins}" Focusable="False">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel Margin="0,0,0,8" ToolTip="{Binding Directory}">
+                                            <TextBlock x:Name="State"
+                                                       DockPanel.Dock="Left"
+                                                       Text="&#xE73E;"
+                                                       FontFamily="{StaticResource Overlay.IconFont}"
+                                                       Foreground="{StaticResource Overlay.Success}"
+                                                       Margin="0,2,8,0" />
+                                            <StackPanel>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{Binding Version}"
+                                                               Margin="8,0,0,0"
+                                                               FontFamily="{StaticResource Overlay.MonoFont}"
+                                                               Foreground="{StaticResource Overlay.TextMuted}" />
+                                                </StackPanel>
+                                                <TextBlock x:Name="Detail" Text="{Binding Detail}" Style="{StaticResource Overlay.Hint}" TextWrapping="Wrap" TextTrimming="None" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                        <DataTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding HasProblem}" Value="True">
+                                                <Setter TargetName="State" Property="Text" Value="&#xE7BA;" />
+                                                <Setter TargetName="State" Property="Foreground" Value="{StaticResource Overlay.Warning}" />
+                                                <Setter TargetName="Detail" Property="Foreground" Value="{StaticResource Overlay.Warning}" />
+                                            </DataTrigger>
+                                        </DataTemplate.Triggers>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Button Style="{StaticResource LinkButton}"
+                                    Content="Open plugins folder"
+                                    HorizontalAlignment="Left"
+                                    Command="{Binding OpenPluginsCommand}" />
                         </StackPanel>
 
                         <Border Visibility="{Binding IsMachinesSelected, Converter={StaticResource BoolToVisibility}}">

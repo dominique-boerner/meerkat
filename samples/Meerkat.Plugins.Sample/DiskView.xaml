@@ -1,0 +1,15 @@
+<UserControl x:Class="Meerkat.Plugins.Sample.DiskView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- The theme of the shell is reached with DynamicResource, so the page looks like the built-in ones. -->
+    <StackPanel Margin="16">
+        <TextBlock x:Name="Drive" Style="{DynamicResource Overlay.ColumnHeader}" />
+        <TextBlock x:Name="Free"
+                   Margin="0,6,0,8"
+                   FontSize="20"
+                   FontFamily="{DynamicResource Overlay.MonoFont}"
+                   Foreground="{DynamicResource Overlay.Text}" />
+        <ProgressBar x:Name="Used" Style="{DynamicResource Overlay.Meter}" Height="6" Maximum="1" />
+        <TextBlock x:Name="Total" Margin="0,8,0,0" Style="{DynamicResource Overlay.Hint}" />
+    </StackPanel>
+</UserControl>

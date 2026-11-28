@@ -35,6 +35,7 @@ services, and for notes.
 - Per-monitor DPI aware; choose the monitor the status bar and the panel appear on
 - A failing widget is suspended and can be restarted without affecting the shell or other widgets
 - Updates itself from GitHub releases, with checksum verification and installation on request
+- Takes further widgets as plugins: folders in a plugins folder, built without the source of Meerkat
 
 **Docker widget**
 
@@ -317,6 +318,7 @@ dotnet run --project src/Meerkat.App
 | `src/Meerkat.Widgets.Server` | The Server widget for machines reachable over SSH |
 | `src/Meerkat.Widgets.Services` | The Services widget for the status of external services |
 | `src/Meerkat.Widgets.Notes` | The Notes widget with the scratchpad |
+| `samples/Meerkat.Plugins.Sample` | A widget that is loaded as a plugin instead of being built in |
 | `tests/Meerkat.Tests` | Unit tests (xUnit) |
 
 ### Test environment for the Docker widget
@@ -339,13 +341,21 @@ on the layout or taking screenshots.
 
 ## Writing widgets
 
-Widgets implement a small interface and are registered with the shell through dependency injection.
-See [Building widgets](docs/building-widgets.md) for a walkthrough.
+Widgets implement a small interface. A widget of your own does not have to become part of Meerkat:
+build it as a plugin against the `Meerkat.Abstractions` package that comes with every release, copy
+the result into `%LocalAppData%\Meerkat\plugins\<name>`, and Meerkat loads it at its next start. The
+*General* page of the settings lists the plugins it found and opens that folder.
+
+Plugins run with all your rights, like any program you start. Only install those you trust.
+
+See [Building widgets](docs/building-widgets.md) for a walkthrough of both a plugin and a built-in
+widget.
 
 ## Releases
 
 Releases are built by GitHub Actions. Pushing a tag of the form `v<major>.<minor>.<patch>` runs the
-tests, publishes both archives with SHA-256 checksums and creates the GitHub release:
+tests, publishes both archives and the packages for plugins with SHA-256 checksums and creates the
+GitHub release:
 
 ```powershell
 git tag v1.0.0
@@ -354,6 +364,11 @@ git push origin v1.0.0
 
 Before tagging, move the entries under `Unreleased` in [CHANGELOG.md](CHANGELOG.md) to a section for
 the new version. That section becomes the release text and is what the in-app updater shows.
+
+The packages `Meerkat.Abstractions` and `Meerkat.Ssh` carry the `ContractVersion` from
+`Directory.Build.props` instead of the version of the release. Raise its minor number when the
+contracts gained something and its major number when something a plugin may use was removed or
+changed; Meerkat then refuses plugins built against the old major version.
 
 Tags with a suffix, such as `v1.0.0-beta.1`, are published as pre-releases. To produce the same
 archives locally, run `./build/Publish-Release.ps1 -Version 1.0.0`.

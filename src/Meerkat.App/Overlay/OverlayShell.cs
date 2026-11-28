@@ -1,10 +1,12 @@
 using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.Input;
 using Meerkat.Abstractions;
 using Meerkat.App.Diagnostics;
 using Meerkat.App.Hotkeys;
+using Meerkat.App.Plugins;
 using Meerkat.App.Settings;
 using Meerkat.App.SettingsUi;
 using Meerkat.App.Startup;
@@ -30,6 +32,8 @@ public sealed class OverlayShell(
     IAutostart autostart,
     MachineRegistry machines,
     ISshClient ssh,
+    PluginCatalog plugins,
+    IServiceProvider services,
     ErrorLog errorLog)
 {
     private const int TogglePanelHotkeyId = 1;
@@ -82,6 +86,14 @@ public sealed class OverlayShell(
             RegisterWidget(widget);
         }
 
+        // Plugins come after the built-in widgets and cannot take the id of one of them.
+        foreach (var widget in plugins.CreateWidgets(services, _hostedWidgets.Select(hosted => hosted.Entry.Id)))
+        {
+            RegisterWidget(widget);
+        }
+
+        ReportPluginProblems();
+
         ApplyWidgetOrder(settings.Current.WidgetOrder);
         panel.OrderChanged += (_, _) => SaveWidgetOrder();
 
@@ -122,6 +134,16 @@ public sealed class OverlayShell(
         {
             // Without id and title the widget can neither be shown nor configured, so it is skipped entirely.
             errorLog.Write($"Widget {widget.GetType().FullName} could not be registered", exception);
+        }
+    }
+
+    /// <summary>Says once, at the start, that a plugin does not work; the settings tell which one and why.</summary>
+    private void ReportPluginProblems()
+    {
+        var failed = plugins.Plugins.Where(plugin => plugin.Problems.Count > 0).Select(plugin => plugin.Name).ToList();
+        if (failed.Count > 0)
+        {
+            tray.ShowWarning($"{string.Join(", ", failed)}: {(failed.Count == 1 ? "this plugin does" : "these plugins do")} not work. The settings tell why.");
         }
     }
 
@@ -404,10 +426,12 @@ public sealed class OverlayShell(
                 HotkeyGesture.ToDisplayText(GetGestureText(hotkey)),
                 hosted.Entry.Id)))],
             autostart,
-            _hotkeyWarning)
+            _hotkeyWarning,
+            [.. plugins.Plugins.Select(plugin => new PluginViewModel(plugin))])
         {
             SuspendHotkeys = hotkeys.Suspend,
             OpenSettingsFile = OpenSettingsFile,
+            OpenPluginsFolder = OpenPluginsFolder,
         };
         viewModel.Applied += async (_, _) =>
         {
@@ -450,6 +474,20 @@ public sealed class OverlayShell(
         catch (Exception exception)
         {
             errorLog.Write("Opening the settings file failed", exception);
+        }
+    }
+
+    private void OpenPluginsFolder()
+    {
+        try
+        {
+            // Nobody has the folder before the first plugin; it is created so that there is a place to put one.
+            Directory.CreateDirectory(AppPaths.UserPluginDirectory);
+            Process.Start(new ProcessStartInfo(AppPaths.UserPluginDirectory) { UseShellExecute = true });
+        }
+        catch (Exception exception)
+        {
+            errorLog.Write("Opening the plugins folder failed", exception);
         }
     }
 

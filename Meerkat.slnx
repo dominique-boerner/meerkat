@@ -9,6 +9,9 @@
     <Project Path="src/Meerkat.Widgets.Server/Meerkat.Widgets.Server.csproj" />
     <Project Path="src/Meerkat.Widgets.Services/Meerkat.Widgets.Services.csproj" />
   </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/Meerkat.Plugins.Sample/Meerkat.Plugins.Sample.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Meerkat.Tests/Meerkat.Tests.csproj" />
   </Folder>

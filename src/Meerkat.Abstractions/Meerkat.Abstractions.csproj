@@ -1,5 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <UseWPF>true</UseWPF>
+    <!-- Published as a package, so that a plugin can be built without the source of Meerkat. -->
+    <IsPackable>true</IsPackable>
+    <PackageId>Meerkat.Abstractions</PackageId>
+    <PackageVersion>$(ContractVersion)</PackageVersion>
+    <AssemblyVersion>$(ContractVersion).0</AssemblyVersion>
+    <Description>The contracts a Meerkat widget implements, and the theme of the shell. Reference it to build a widget as a plugin.</Description>
   </PropertyGroup>
 </Project>

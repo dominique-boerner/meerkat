@@ -4,6 +4,7 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Meerkat.App.Hotkeys;
+using Meerkat.App.Plugins;
 using Meerkat.App.Settings;
 using Meerkat.App.Startup;
 using Meerkat.App.Updates;
@@ -70,6 +71,23 @@ public sealed partial class WidgetHotkeyViewModel(string settingsKey, string tit
     public string WidgetTitle { get; } = widgetTitle;
 }
 
+/// <summary>A plugin as the settings list it: what it added, or why it does not work.</summary>
+public sealed class PluginViewModel(PluginInfo plugin)
+{
+    public string Name { get; } = plugin.Name;
+
+    public string? Version { get; } = plugin.Version;
+
+    public bool HasProblem { get; } = plugin.Problems.Count > 0;
+
+    /// <summary>The widgets the plugin added, and below them whatever went wrong.</summary>
+    public string Detail { get; } = string.Join(
+        Environment.NewLine,
+        new[] { plugin.Widgets.Count > 0 ? $"Adds {string.Join(", ", plugin.Widgets)}" : null }.Concat(plugin.Problems).Where(line => line is not null));
+
+    public string Directory { get; } = plugin.Directory;
+}
+
 /// <summary>
 /// The settings of the shell. There is nothing to save: every change is stored and applied the moment
 /// it is made, and what cannot be stored, like two hotkeys with the same combination, is said so instead.
@@ -132,8 +150,10 @@ public sealed partial class SettingsViewModel : ObservableObject
         MachinesPageViewModel? machines = null,
         IReadOnlyList<WidgetHotkeyViewModel>? widgetHotkeys = null,
         IAutostart? autostart = null,
-        string? hotkeyWarning = null)
+        string? hotkeyWarning = null,
+        IReadOnlyList<PluginViewModel>? plugins = null)
     {
+        Plugins = plugins ?? [];
         _settings = settings;
         _autostart = autostart;
         _widgetHotkeys = widgetHotkeys ?? [];
@@ -194,7 +214,16 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>Opens the settings file in whatever the user edits such files with.</summary>
     public Action? OpenSettingsFile { get; init; }
 
+    /// <summary>Opens the folder plugins are installed into.</summary>
+    public Action? OpenPluginsFolder { get; init; }
+
     public ObservableCollection<NavigationItem> NavigationItems { get; } = [];
+
+    public IReadOnlyList<PluginViewModel> Plugins { get; }
+
+    public bool HasPlugins => Plugins.Count > 0;
+
+    public string PluginInfo => "Plugins add widgets that are not part of Meerkat. A plugin is a folder that is copied into the plugins folder; Meerkat finds it at its next start. Plugins can do whatever you can do on this computer, so only install those you trust.";
 
     public IReadOnlyList<MonitorOption> Monitors { get; }
 
@@ -244,6 +273,9 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     [RelayCommand]
     private void OpenFile() => OpenSettingsFile?.Invoke();
+
+    [RelayCommand]
+    private void OpenPlugins() => OpenPluginsFolder?.Invoke();
 
     partial void OnSelectedItemChanged(NavigationItem? oldValue, NavigationItem newValue)
     {

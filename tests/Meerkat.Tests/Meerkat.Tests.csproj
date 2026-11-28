@@ -22,4 +22,13 @@
     <ProjectReference Include="..\..\src\Meerkat.Widgets.Server\Meerkat.Widgets.Server.csproj" />
     <ProjectReference Include="..\..\src\Meerkat.Widgets.Services\Meerkat.Widgets.Services.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Built with the tests but not referenced: it is loaded the way Meerkat loads a plugin, from a folder. -->
+    <ProjectReference Include="..\..\samples\Meerkat.Plugins.Sample\Meerkat.Plugins.Sample.csproj" ReferenceOutputAssembly="false" OutputItemType="SamplePlugin" />
+  </ItemGroup>
+  <Target Name="InstallSamplePlugin" AfterTargets="ResolveProjectReferences" BeforeTargets="AssignTargetPaths">
+    <ItemGroup>
+      <None Include="@(SamplePlugin)" Link="plugins\%(Filename)\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
 </Project>

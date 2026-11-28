@@ -15,5 +15,16 @@
     <Copyright>Copyright (c) Meerkat contributors</Copyright>
     <NeutralLanguage>en</NeutralLanguage>
     <RepositoryUrl>https://github.com/dominique-boerner/meerkat</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <PropertyGroup>
+    <!--
+      Version of what plugins are built against: Meerkat.Abstractions and Meerkat.Ssh. It moves apart
+      from the version of the application, as a plugin only cares whether its contract changed.
+      Raise the minor number when something is added, and the major number when something a plugin
+      may use is removed or changed; Meerkat then refuses plugins built against the old major version.
+    -->
+    <ContractVersion>1.0.0</ContractVersion>
   </PropertyGroup>
 </Project>

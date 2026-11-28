@@ -1,5 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- SSH access through the OpenSSH client of Windows, shared by the widgets that reach other machines. -->
+  <PropertyGroup>
+    <!-- Published as a package, so that a plugin can reach the machines the user entered. -->
+    <IsPackable>true</IsPackable>
+    <PackageId>Meerkat.Ssh</PackageId>
+    <PackageVersion>$(ContractVersion)</PackageVersion>
+    <AssemblyVersion>$(ContractVersion).0</AssemblyVersion>
+    <Description>SSH access and the shared list of machines for Meerkat widgets that reach other computers.</Description>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Meerkat.Abstractions\Meerkat.Abstractions.csproj" />
   </ItemGroup>

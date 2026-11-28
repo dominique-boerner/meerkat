@@ -9,6 +9,20 @@ The section of a version becomes the text of its GitHub release and is what Meer
 
 ## [Unreleased]
 
+### Added
+
+- Plugins: Meerkat loads widgets that are not part of it from folders below
+  `%LocalAppData%\Meerkat\plugins`, or below `plugins` next to `Meerkat.exe`. A plugin is built
+  against the packages `Meerkat.Abstractions` and `Meerkat.Ssh`, which now come with every release,
+  and may bring libraries of its own. The *General* page of the settings lists the plugins that were
+  found, says why if one does not work, and opens the folder. Plugins run with all rights of the
+  user, so only install those you trust.
+
+### Changed
+
+- The contracts for widgets have a version of their own, starting at 1.0, which decides whether a
+  plugin fits this Meerkat.
+
 ## [1.8.0] - 2026-11-28
 
 ### Added

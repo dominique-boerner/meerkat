@@ -4,6 +4,7 @@ using Meerkat.Abstractions;
 using Meerkat.App.Diagnostics;
 using Meerkat.App.Hotkeys;
 using Meerkat.App.Overlay;
+using Meerkat.App.Plugins;
 using Meerkat.App.Settings;
 using Meerkat.App.Startup;
 using Meerkat.App.Tray;
@@ -113,6 +114,9 @@ public partial class App : Application
         services.AddServerWidget();
         services.AddServicesWidget();
         services.AddNotesWidget();
+
+        // Loaded before anything is shown, but only created by the shell, which keeps a failing one apart.
+        services.AddSingleton(_ => new PluginCatalog(AppPaths.PluginDirectories, errorLog));
 
         return services.BuildServiceProvider();
     }

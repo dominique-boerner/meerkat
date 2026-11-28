@@ -7,9 +7,15 @@ things to the shell:
 - a **page** in the panel, where the user looks at details and acts on them
 
 The shell draws the status bar and the panel, decides what is prominent enough to show, and isolates
-failures. In the current version widgets are compiled into the application and registered through
-dependency injection. The contracts live in their own assembly so that widgets can be loaded as
-plugins later without changing them.
+failures.
+
+A widget reaches Meerkat in one of two ways, and is written the same for both:
+
+- as a **plugin**: a project of your own, in a repository of your own, whose build output is copied
+  into the plugins folder of an unchanged Meerkat. This is the way for a widget that is of use to
+  you or your company only. See [Shipping a widget as a plugin](#shipping-a-widget-as-a-plugin).
+- **built in**: a project in this repository that is compiled into the application. This is the way
+  for a widget that is meant to become part of Meerkat. Steps 1 to 3 describe it.
 
 ## 1. Create a project
 
@@ -143,6 +149,89 @@ services.AddDiskWidget();
 Add a project reference from `Meerkat.App` to the widget project and the widget appears in the status
 bar, the panel and the settings.
 
+## Shipping a widget as a plugin
+
+A plugin is a folder that holds an assembly of the same name:
+
+```
+%LocalAppData%\Meerkat\plugins\
+  Acme.Deploys\
+    Acme.Deploys.dll      every public class in it that implements IOverlayWidget becomes a widget
+    Some.Library.dll      whatever else the plugin needs
+```
+
+Meerkat looks into that folder when it starts, and into a `plugins` folder next to `Meerkat.exe`,
+where an administrator can install plugins for everybody who uses the computer. Updates of Meerkat
+leave both alone. *Open plugins folder* on the *General* page of the settings leads there; the page
+also lists the plugins that were found, and says why if one does not work.
+
+### The project
+
+The contracts are published as packages with every
+[release](https://github.com/dominique-boerner/meerkat/releases): `Meerkat.Abstractions`, and
+`Meerkat.Ssh` for widgets that reach other machines. Download them into a folder and name it as a
+package source in a `nuget.config` next to your project:
+
+```xml
+<configuration>
+  <packageSources>
+    <add key="meerkat" value="packages" />
+  </packageSources>
+</configuration>
+```
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!-- Copies the libraries the plugin uses next to it, where Meerkat looks for them. -->
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Meerkat brings the contracts itself, so they are built against but not copied. -->
+    <PackageReference Include="Meerkat.Abstractions" Version="1.0.0" ExcludeAssets="runtime" />
+  </ItemGroup>
+</Project>
+```
+
+Name the assembly like the folder it will be installed into. There is nothing to register: the
+widget from step 2 works as it is. Its constructor may ask for the
+[services provided by the shell](#services-provided-by-the-shell), and for `ISshClient` and
+`MachineRegistry` when the project references `Meerkat.Ssh`. Build the project, copy the output into
+a folder below the plugins folder, and restart Meerkat.
+
+`samples/Meerkat.Plugins.Sample` is such a plugin, with a page written in XAML. It references the
+project instead of the package only because it lives in this repository.
+
+### What is shared and what is not
+
+- Whatever Meerkat brings itself is shared with the plugin: the contracts, WPF, and the libraries
+  Meerkat uses. A copy of one of them in the plugin's folder is ignored.
+- Everything else is loaded from the plugin's folder and belongs to that plugin alone, so two plugins
+  may bring different versions of the same library.
+- The id of a widget must not be taken by another widget; prefix it with something of your own, such
+  as `acme-deploys`.
+- A loaded plugin keeps its files open. To replace one, exit Meerkat first.
+
+### Versions
+
+The packages carry the version of the contract, not of Meerkat, and it only moves when the contract
+does. Meerkat loads a plugin built against the same major version and a minor version up to its own:
+
+| Built against | Meerkat brings | |
+|---|---|---|
+| 1.0 | 1.3 | Loaded: a minor version only adds |
+| 1.4 | 1.3 | Refused: the plugin may use what this Meerkat lacks; update Meerkat |
+| 1.x | 2.0 | Refused: something a plugin may use changed; rebuild the plugin against 2.0 |
+
+### Trust
+
+A plugin is code that runs as part of Meerkat with all rights of the user: it can read files, reach
+the network and read what other widgets stored in the Credential Manager. Meerkat only loads what
+lies in the two folders and never fetches a plugin itself. Install only plugins whose source you
+trust.
+
 ## Status and alerts
 
 The status bar is always visible, so the shell is strict about what reaches it:
@@ -183,7 +272,7 @@ public IReadOnlyList<WidgetHotkey> Hotkeys =>
 ];
 ```
 
-The shell registers them while the widget is enabled, lists them on the *Hotkeys* page of the
+The shell registers them while the widget is enabled, lists them on the *General* page of the
 settings so the user can change the combination, and calls the handler on the UI thread. The id
 identifies the hotkey in the stored settings, so keep it stable. A hotkey should do something that is
 worth interrupting the user's work for, such as opening a window of your own for a quick entry.
