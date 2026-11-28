@@ -269,6 +269,6 @@
         </Border>
 
         <TextBlock Style="{DynamicResource Overlay.Hint}" Margin="0,12,0,0" TextWrapping="Wrap"
-                   Text="Changes take effect when you save the settings. Each check is a single GET request to the address shown; nothing else is sent." />
+                   Text="Each check is a single GET request to the address shown; nothing else is sent." />
     </StackPanel>
 </UserControl>

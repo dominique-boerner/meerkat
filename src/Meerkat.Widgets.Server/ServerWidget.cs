@@ -54,6 +54,9 @@ public static class ServerWidgetServiceCollectionExtensions
     public static IServiceCollection AddServerWidget(this IServiceCollection services)
     {
         services.TryAddSingleton<ISshClient, OpenSshClient>();
+
+        // The machines are shared with other widgets that reach machines over SSH; whoever registers first provides them.
+        services.TryAddSingleton<MachineRegistry>();
         services.AddSingleton<IServerProbe, ServerProbe>();
         services.AddSingleton<ServerSettingsSource>();
         services.AddSingleton(provider => new ServerWidgetViewModel(

@@ -116,21 +116,34 @@ public sealed class ServicesWidgetSettings
         double.IsFinite(endpoint.IntervalSeconds) ? Math.Max(MinimumIntervalSeconds, endpoint.IntervalSeconds) : ServiceEndpoint.DefaultIntervalSeconds);
 }
 
-public sealed class ServicesSettingsSource(IWidgetSettingsStore store)
+public sealed class ServicesSettingsSource
 {
+    private readonly IWidgetSettingsStore _store;
     private ServicesWidgetSettings? _current;
+
+    public ServicesSettingsSource(IWidgetSettingsStore store)
+    {
+        _store = store;
+
+        // Settings changed from outside, such as in the settings file, replace what was loaded.
+        store.Reloaded += (_, _) =>
+        {
+            _current = null;
+            Changed?.Invoke(this, EventArgs.Empty);
+        };
+    }
 
     public event EventHandler? Changed;
 
-    public ServicesWidgetSettings Current => _current ??= store.Load<ServicesWidgetSettings>(ServicesWidget.WidgetId);
+    public ServicesWidgetSettings Current => _current ??= _store.Load<ServicesWidgetSettings>(ServicesWidget.WidgetId);
 
     /// <summary>Persists a change made to <see cref="Current"/> in place, without announcing new settings.</summary>
-    public void Save() => store.Save(ServicesWidget.WidgetId, Current);
+    public void Save() => _store.Save(ServicesWidget.WidgetId, Current);
 
     public void Update(ServicesWidgetSettings settings)
     {
         _current = settings;
-        store.Save(ServicesWidget.WidgetId, settings);
+        _store.Save(ServicesWidget.WidgetId, settings);
         Changed?.Invoke(this, EventArgs.Empty);
     }
 }

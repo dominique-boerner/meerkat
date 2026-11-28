@@ -10,6 +10,7 @@ using Meerkat.App.SettingsUi;
 using Meerkat.App.Startup;
 using Meerkat.App.Tray;
 using Meerkat.App.Updates;
+using Meerkat.Ssh;
 using Microsoft.Win32;
 
 namespace Meerkat.App.Overlay;
@@ -27,6 +28,8 @@ public sealed class OverlayShell(
     UpdateViewModel updateViewModel,
     ApplicationRestart applicationRestart,
     IAutostart autostart,
+    MachineRegistry machines,
+    ISshClient ssh,
     ErrorLog errorLog)
 {
     private const int TogglePanelHotkeyId = 1;
@@ -82,6 +85,11 @@ public sealed class OverlayShell(
 
         ApplySettings();
         _statusBarWindow.Show();
+
+        // The settings file may be edited by hand; what is saved there counts as much as a change in the window.
+        var dispatcher = _statusBarWindow.Dispatcher;
+        settings.Reloaded += async (_, _) => await OnSettingsReloadedAsync();
+        settings.Watch(reload => dispatcher.BeginInvoke(reload));
 
         // Showing the window lets WPF apply its own initial placement, so the monitor bounds are enforced again.
         _statusBarWindow.MoveToBounds(MonitorLocator.ResolveWorkingArea(settings.Current.Monitor));
@@ -357,72 +365,111 @@ public sealed class OverlayShell(
 
     private void OpenSettings()
     {
-        if (_settingsWindow is not null)
+        // Asked for from the panel, the settings open where the user is: on the page of the widget shown there.
+        var widgetId = state.IsPanelOpen ? panel.SelectedWidget?.Id : null;
+        if (_settingsWindow is null)
         {
-            _settingsWindow.Activate();
-            return;
+            _settingsWindow = new SettingsWindow { DataContext = CreateSettingsViewModel() };
+            _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+            _settingsWindow.Show();
         }
 
-        var settingsViewModel = new SettingsViewModel(
+        if (widgetId is not null && _settingsWindow.DataContext is SettingsViewModel viewModel)
+        {
+            viewModel.SelectWidget(widgetId);
+        }
+
+        _settingsWindow.Activate();
+    }
+
+    private SettingsViewModel CreateSettingsViewModel()
+    {
+        var viewModel = new SettingsViewModel(
             settings,
             MonitorLocator.GetOptions(),
-            [.. _hostedWidgets.Select(hosted => new WidgetToggleViewModel(
+            [.. _hostedWidgets.Select(hosted => new WidgetPageViewModel(
                 hosted.Entry.Id,
                 hosted.Entry.Title,
-                hosted.Widget.GetType().Namespace ?? string.Empty,
-                !settings.Current.DisabledWidgets.Contains(hosted.Entry.Id)))],
-            CreateSettingsSections(),
+                !settings.Current.DisabledWidgets.Contains(hosted.Entry.Id),
+                CreateSettingsView(hosted)))],
             updateViewModel,
-            _hotkeyWarning,
-            AppPaths.SettingsFileDisplayPath)
-        {
-            SuspendHotkeys = hotkeys.Suspend,
-            Autostart = autostart,
-            WidgetHotkeys = [.. _hostedWidgets.SelectMany(hosted => hosted.Hotkeys.Select(hotkey => new WidgetHotkeyViewModel(
+            new MachinesPageViewModel(machines, ssh, SshConfigFile.ReadHostAliases(SshConfigFile.DefaultPath)),
+            [.. _hostedWidgets.SelectMany(hosted => hosted.Hotkeys.Select(hotkey => new WidgetHotkeyViewModel(
                 hotkey.SettingsKey,
                 hotkey.Definition.Title,
                 hosted.Entry.Title,
                 HotkeyGesture.ToDisplayText(GetGestureText(hotkey)),
                 hosted.Entry.Id)))],
+            autostart,
+            _hotkeyWarning)
+        {
+            SuspendHotkeys = hotkeys.Suspend,
+            OpenSettingsFile = OpenSettingsFile,
         };
-        settingsViewModel.Saved += async (_, _) =>
+        viewModel.Applied += async (_, _) =>
         {
             ApplySettings();
+            viewModel.HotkeyWarning = _hotkeyWarning;
             await SyncWidgetsAsync();
-
-            // The channel or the automatic check may have changed.
+        };
+        viewModel.UpdateSettingsApplied += async (_, _) =>
+        {
             updateViewModel.Refresh();
             if (settings.Current.Updates.CheckAutomatically)
             {
                 await updates.CheckAsync(userInitiated: false);
             }
         };
-
-        _settingsWindow = new SettingsWindow { DataContext = settingsViewModel };
-        _settingsWindow.Closed += (_, _) => _settingsWindow = null;
-        _settingsWindow.Show();
-        _settingsWindow.Activate();
+        return viewModel;
     }
 
-    private List<WidgetSettingsSection> CreateSettingsSections()
+    private FrameworkElement? CreateSettingsView(HostedWidget hosted)
     {
-        var sections = new List<WidgetSettingsSection>();
-        foreach (var hosted in _hostedWidgets)
+        try
         {
-            try
-            {
-                if (hosted.Widget.SettingsPage is { } page)
-                {
-                    sections.Add(new WidgetSettingsSection(hosted.Entry.Title, page, page.CreateView(), hosted.Entry.Id));
-                }
-            }
-            catch (Exception exception)
-            {
-                errorLog.Write($"Widget '{hosted.Entry.Id}' failed to create its settings page", exception);
-            }
+            return hosted.Widget.SettingsPage?.CreateView();
         }
+        catch (Exception exception)
+        {
+            errorLog.Write($"Widget '{hosted.Entry.Id}' failed to create its settings page", exception);
+            return null;
+        }
+    }
 
-        return sections;
+    private void OpenSettingsFile()
+    {
+        try
+        {
+            // Somebody who never changed a setting has no file yet; it is written so that there is one to open.
+            settings.Save();
+            Process.Start(new ProcessStartInfo(settings.FilePath) { UseShellExecute = true });
+        }
+        catch (Exception exception)
+        {
+            errorLog.Write("Opening the settings file failed", exception);
+        }
+    }
+
+    /// <summary>Follows settings that were changed in the file instead of in the window.</summary>
+    private async Task OnSettingsReloadedAsync()
+    {
+        ApplyWidgetOrder(settings.Current.WidgetOrder);
+        ApplySettings();
+        await SyncWidgetsAsync();
+        updateViewModel.Refresh();
+
+        // What the window shows was read from the old settings.
+        if (_settingsWindow is { DataContext: SettingsViewModel shown })
+        {
+            var selected = shown.SelectedWidget?.Id;
+            var viewModel = CreateSettingsViewModel();
+            if (selected is not null)
+            {
+                viewModel.SelectWidget(selected);
+            }
+
+            _settingsWindow.DataContext = viewModel;
+        }
     }
 
     private void ApplySettings()

@@ -243,7 +243,7 @@ public class GitWidgetViewModelTests
     }
 
     [Fact]
-    public async Task SettingsPage_RemovesTheStoredTokenOnSave()
+    public async Task SettingsPage_RemovesTheStoredTokenAtOnceAndTellsTheWidget()
     {
         var settings = new GitWidgetSettings();
         _settingsStore.Save(GitWidget.WidgetId, settings);
@@ -251,18 +251,15 @@ public class GitWidgetViewModelTests
         var source = new GitSettingsSource(_settingsStore, _secrets);
         var viewModel = new GitSettingsPageViewModel(source, _factory);
         await viewModel.Initialization;
+        var changes = 0;
+        viewModel.Changed += (_, _) => changes++;
 
         viewModel.RemoveTokenCommand.Execute(null);
 
-        Assert.True(viewModel.IsTokenRemovalRequested);
         Assert.False(viewModel.HasStoredToken);
         Assert.Equal(GitConnectionState.NotConnected, viewModel.ConnectionState);
-
-        // Nothing is deleted until the user saves; cancelling the settings keeps the token.
-        Assert.Equal("stored-token", source.ReadToken(settings));
-
-        source.RemoveToken(viewModel.ToSettings());
         Assert.Null(source.ReadToken(settings));
+        Assert.Equal(1, changes);
     }
 
     [Theory]

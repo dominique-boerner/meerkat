@@ -23,10 +23,23 @@ The section of a version becomes the text of its GitHub release and is what Meer
   are reported, when the daily scan runs and whether those without a fix are shown.
 - Widgets can add further entries to the status bar besides their main one.
 
+- A *Machines* page in the settings, where other machines are entered once for all widgets. The
+  Docker and Server pages only choose what a machine is used for. Hosts entered before are moved
+  there on the first start; a host both widgets knew becomes one machine.
+- *Open settings.json* in the settings window opens the settings file, and Meerkat takes over what
+  is saved in it right away.
+
 ### Changed
 
-- The Docker settings list this computer and other machines together as *Docker systems*, each with
-  the scanner found on it.
+- Settings are stored and applied the moment they are changed; the Save and Cancel buttons are gone.
+- The settings have half as many pages: *General* now holds hotkeys and updates as well, and each
+  widget is switched on and off on its own page, which replaces the *Widgets* page.
+- Docker and Server ask for a pace instead of seconds: *Refresh* is fast, normal or economical, and
+  other machines are asked less often on their own. Exact intervals and the number of log lines
+  kept can still be set in the settings file.
+- Explanations in the settings moved into tooltips of small info symbols.
+- Widgets: a settings page stores its changes itself, so `IWidgetSettingsPage.Apply` is gone, and
+  `IWidgetSettingsStore` announces settings that were changed from outside.
 
 ## [1.6.0] - 2026-11-27
 

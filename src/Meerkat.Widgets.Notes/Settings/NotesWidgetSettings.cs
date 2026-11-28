@@ -29,21 +29,34 @@ public sealed class NotesWidgetSettings
         : Environment.ExpandEnvironmentVariables(Directory.Trim());
 }
 
-public sealed class NotesSettingsSource(IWidgetSettingsStore store)
+public sealed class NotesSettingsSource
 {
+    private readonly IWidgetSettingsStore _store;
     private NotesWidgetSettings? _current;
+
+    public NotesSettingsSource(IWidgetSettingsStore store)
+    {
+        _store = store;
+
+        // Settings changed from outside, such as in the settings file, replace what was loaded.
+        store.Reloaded += (_, _) =>
+        {
+            _current = null;
+            Changed?.Invoke(this, EventArgs.Empty);
+        };
+    }
 
     public event EventHandler? Changed;
 
-    public NotesWidgetSettings Current => _current ??= store.Load<NotesWidgetSettings>(NotesWidget.WidgetId);
+    public NotesWidgetSettings Current => _current ??= _store.Load<NotesWidgetSettings>(NotesWidget.WidgetId);
 
     /// <summary>Persists a change made to <see cref="Current"/> in place, without announcing new settings.</summary>
-    public void Save() => store.Save(NotesWidget.WidgetId, Current);
+    public void Save() => _store.Save(NotesWidget.WidgetId, Current);
 
     public void Update(NotesWidgetSettings settings)
     {
         _current = settings;
-        store.Save(NotesWidget.WidgetId, settings);
+        _store.Save(NotesWidget.WidgetId, settings);
         Changed?.Invoke(this, EventArgs.Empty);
     }
 }

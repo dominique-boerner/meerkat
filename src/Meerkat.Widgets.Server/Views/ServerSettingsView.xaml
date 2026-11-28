@@ -20,317 +20,176 @@
             <Setter Property="FontSize" Value="11" />
             <Setter Property="Margin" Value="0,0,0,4" />
         </Style>
-        <Style x:Key="ChoiceRadio" TargetType="RadioButton">
-            <Setter Property="Foreground" Value="{DynamicResource Overlay.Text}" />
-            <Setter Property="Margin" Value="0,0,16,0" />
+        <Style x:Key="Badge" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource Overlay.SurfaceRaised}" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="Padding" Value="8,2" />
             <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="RadioButton">
-                        <StackPanel Orientation="Horizontal" Background="Transparent">
-                            <Grid Width="14" Height="14" VerticalAlignment="Center">
-                                <Ellipse x:Name="Ring" Stroke="{DynamicResource Overlay.TextMuted}" StrokeThickness="1" Fill="Transparent" />
-                                <Ellipse x:Name="Dot" Width="6" Height="6" Fill="{DynamicResource Overlay.Accent}" Visibility="Collapsed" />
-                            </Grid>
-                            <ContentPresenter Margin="7,0,0,0" VerticalAlignment="Center" />
-                        </StackPanel>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Ring" Property="Stroke" Value="{DynamicResource Overlay.Accent}" />
-                                <Setter TargetName="Dot" Property="Visibility" Value="Visible" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+        </Style>
+        <Style x:Key="ResultText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Overlay.Success}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsCheckFailed}" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource Overlay.Danger}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding CheckResult}" Value="">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
     </UserControl.Resources>
 
     <StackPanel>
         <StackPanel Orientation="Horizontal">
-            <TextBlock Style="{DynamicResource Overlay.FormLabel}" Text="Default check interval" Margin="0,0,12,0" />
-            <ComboBox Width="150"
-                      ItemsSource="{Binding DefaultIntervals}"
-                      SelectedItem="{Binding DefaultInterval}"
-                      DisplayMemberPath="DisplayName" />
+            <StackPanel Orientation="Horizontal" Width="170">
+                <TextBlock Style="{DynamicResource Overlay.FormLabel}" Text="Refresh" />
+                <ContentControl Style="{DynamicResource Overlay.Info}" ToolTip="{Binding RefreshInfo}" />
+            </StackPanel>
+            <Border CornerRadius="5" BorderThickness="1" BorderBrush="{DynamicResource Overlay.Border}" Background="{DynamicResource Overlay.SurfaceRaised}">
+                <StackPanel Orientation="Horizontal">
+                    <RadioButton Style="{DynamicResource Overlay.Segment}" GroupName="ServerRefresh" Content="Fast" IsChecked="{Binding IsFast}" />
+                    <RadioButton Style="{DynamicResource Overlay.Segment}" GroupName="ServerRefresh" Content="Normal" IsChecked="{Binding IsNormal}" />
+                    <RadioButton Style="{DynamicResource Overlay.Segment}" GroupName="ServerRefresh" Content="Economical" IsChecked="{Binding IsEconomical}" />
+                </StackPanel>
+            </Border>
         </StackPanel>
 
-        <DockPanel Margin="0,16,0,6">
-            <Button DockPanel.Dock="Right" Content="+ Add host" Command="{Binding AddHostCommand}" />
-            <TextBlock Style="{DynamicResource Overlay.ColumnHeader}" FontSize="10.5" Text="HOSTS" VerticalAlignment="Center" />
+        <!-- The machines are entered elsewhere, once for all widgets; here one of them is picked and what the widget does with it. -->
+        <DockPanel Margin="0,20,0,4">
+            <Grid DockPanel.Dock="Right" ToolTip="{Binding AddMachineHint}" ToolTipService.ShowOnDisabled="True">
+                <ToggleButton x:Name="AddMachineButton" Content="+ Machine" IsChecked="{Binding IsPickerOpen}" IsEnabled="{Binding CanAddMachine}">
+                    <ToggleButton.Style>
+                        <Style TargetType="ToggleButton" BasedOn="{StaticResource Overlay.Button}">
+                            <Style.Triggers>
+                                <!-- While the list is open a click on the button only closes it, which the list does by itself. -->
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter Property="IsHitTestVisible" Value="False" />
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ToggleButton.Style>
+                </ToggleButton>
+                <Popup IsOpen="{Binding IsPickerOpen}" StaysOpen="False" PlacementTarget="{Binding ElementName=AddMachineButton}" Placement="Bottom"
+                       HorizontalOffset="0" VerticalOffset="4" AllowsTransparency="True">
+                    <Border Background="{DynamicResource Overlay.SurfaceRaised}" BorderBrush="{DynamicResource Overlay.Border}" BorderThickness="1" CornerRadius="6" Padding="4" MinWidth="220">
+                        <ItemsControl ItemsSource="{Binding AvailableMachines}" Focusable="False">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Cursor="Hand" HorizontalContentAlignment="Stretch"
+                                            Command="{Binding DataContext.AddMachineCommand, ElementName=Root}" CommandParameter="{Binding}">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border x:Name="Chrome" Background="Transparent" CornerRadius="4" Padding="8,5">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" Foreground="{DynamicResource Overlay.Text}" />
+                                                        <TextBlock Text="{Binding Destination}" FontFamily="{DynamicResource Overlay.MonoFont}" FontSize="10.5"
+                                                                   Foreground="{DynamicResource Overlay.TextMuted}" />
+                                                    </StackPanel>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Overlay.Hover}" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+                </Popup>
+            </Grid>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Style="{DynamicResource Overlay.ColumnHeader}" FontSize="10.5" Text="MACHINES" VerticalAlignment="Center" />
+                <ContentControl Style="{DynamicResource Overlay.Info}" ToolTip="{Binding MachinesInfo}" />
+            </StackPanel>
         </DockPanel>
-
-        <Grid Margin="0,0,0,2">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="140" />
-                <ColumnDefinition Width="150" />
-                <ColumnDefinition Width="100" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0" Style="{DynamicResource Overlay.Hint}" Text="Name" />
-            <TextBlock Grid.Column="1" Style="{DynamicResource Overlay.Hint}" Text="Address" />
-            <TextBlock Grid.Column="2" Style="{DynamicResource Overlay.Hint}" Text="Interval" />
-            <TextBlock Grid.Column="3" Style="{DynamicResource Overlay.Hint}" Text="Services" />
-        </Grid>
-        <ItemsControl ItemsSource="{Binding Hosts}" Focusable="False">
+        <ItemsControl ItemsSource="{Binding Machines}" Focusable="False">
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                    <Border BorderBrush="{DynamicResource Overlay.Border}" BorderThickness="0,1,0,0" Padding="0,7">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="140" />
-                                <ColumnDefinition Width="150" />
-                                <ColumnDefinition Width="100" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
-                            <TextBlock Grid.Column="1"
-                                       Text="{Binding Address}"
-                                       FontFamily="{DynamicResource Overlay.MonoFont}"
-                                       FontSize="11"
-                                       Foreground="{DynamicResource Overlay.TextMuted}"
-                                       TextTrimming="CharacterEllipsis"
-                                       Margin="0,0,8,0" />
-                            <TextBlock x:Name="Interval" Grid.Column="2" Text="{Binding IntervalText}" Foreground="{DynamicResource Overlay.TextMuted}" />
-                            <TextBlock Grid.Column="3"
-                                       Text="{Binding ServicesText}"
-                                       FontFamily="{DynamicResource Overlay.MonoFont}"
-                                       FontSize="11"
-                                       TextTrimming="CharacterEllipsis"
-                                       Margin="0,0,8,0" />
-                            <Button Grid.Column="4"
-                                    Style="{StaticResource LinkButton}"
-                                    Content="Edit"
-                                    Command="{Binding DataContext.EditHostCommand, ElementName=Root}"
-                                    CommandParameter="{Binding}" />
-                        </Grid>
+                    <Border BorderBrush="{DynamicResource Overlay.Border}" BorderThickness="0,0,0,1" Padding="0,7">
+                        <StackPanel>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="Edit" VerticalAlignment="Center" Margin="12,0,0,0"
+                                        Command="{Binding ToggleOpenCommand}" />
+                                <Border DockPanel.Dock="Right" Style="{StaticResource Badge}" MaxWidth="260">
+                                    <TextBlock Text="{Binding Summary}" FontSize="11" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Overlay.TextMuted}" />
+                                </Border>
+                                <StackPanel Margin="0,0,10,0">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Overlay.Text}" />
+                                    <TextBlock Text="{Binding Destination}" FontFamily="{DynamicResource Overlay.MonoFont}" FontSize="10.5" TextTrimming="CharacterEllipsis"
+                                               Foreground="{DynamicResource Overlay.TextMuted}" />
+                                </StackPanel>
+                            </DockPanel>
+
+                            <Border Margin="0,8,0,2" Padding="14,12" CornerRadius="6" BorderThickness="1" BorderBrush="{DynamicResource Overlay.Border}"
+                                    Background="{DynamicResource Overlay.SurfaceRaised}"
+                                    Visibility="{Binding IsOpen, Converter={StaticResource BoolToVisibility}}">
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="10" />
+                                            <ColumnDefinition Width="90" />
+                                            <ColumnDefinition Width="10" />
+                                            <ColumnDefinition Width="90" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Style="{StaticResource FieldLabel}" Text="Services to watch (systemd)" />
+                                            <TextBox Text="{Binding ServicesText}" FontFamily="{DynamicResource Overlay.MonoFont}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Style="{StaticResource FieldLabel}" Text="Disk yellow %" />
+                                            <TextBox Text="{Binding DiskWarningPercent}" FontFamily="{DynamicResource Overlay.MonoFont}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="4">
+                                            <TextBlock Style="{StaticResource FieldLabel}" Text="Disk red %" />
+                                            <TextBox Text="{Binding DiskErrorPercent}" FontFamily="{DynamicResource Overlay.MonoFont}" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <CheckBox Content="Paused (not checked)" IsChecked="{Binding IsPaused}" Margin="0,10,0,0" />
+                                    <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Overlay.Danger}" FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Error}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock Style="{StaticResource ResultText}" Text="{Binding CheckResult}" Margin="0,8,0,0" />
+                                    <DockPanel Margin="0,12,0,0">
+                                        <Button DockPanel.Dock="Right" Content="Remove" Foreground="{DynamicResource Overlay.Danger}"
+                                                ToolTip="Takes the machine off the Server widget. It stays on the Machines page."
+                                                Command="{Binding DataContext.RemoveMachineCommand, ElementName=Root}" CommandParameter="{Binding}" />
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Style="{DynamicResource Overlay.PrimaryButton}" Content="Connect and check" Command="{Binding CheckCommand}"
+                                                    Visibility="{Binding CanCheck, Converter={StaticResource BoolToVisibility}}" />
+                                            <Button Content="Close" Margin="8,0,0,0" Command="{Binding ToggleOpenCommand}" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
                     </Border>
-                    <DataTemplate.Triggers>
-                        <DataTrigger Binding="{Binding IsPaused}" Value="True">
-                            <Setter TargetName="Interval" Property="Foreground" Value="{DynamicResource Overlay.Warning}" />
-                        </DataTrigger>
-                    </DataTemplate.Triggers>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
-        </ItemsControl>
-        <TextBlock Text="No hosts yet." Margin="0,6,0,0">
+        </ItemsControl>        <TextBlock Text="No machines. Add one with “+ Machine”." Margin="0,2,0,0">
             <TextBlock.Style>
                 <Style TargetType="TextBlock" BasedOn="{StaticResource Overlay.Hint}">
                     <Setter Property="Visibility" Value="Collapsed" />
                     <Style.Triggers>
-                        <DataTrigger Binding="{Binding Hosts.Count}" Value="0">
+                        <DataTrigger Binding="{Binding HasMachines}" Value="False">
                             <Setter Property="Visibility" Value="Visible" />
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
             </TextBlock.Style>
         </TextBlock>
-
-        <TextBlock Text="{Binding LastCheckResult}" Foreground="{DynamicResource Overlay.Success}" FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0">
-            <TextBlock.Style>
-                <Style TargetType="TextBlock">
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding LastCheckResult}" Value="">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </TextBlock.Style>
-        </TextBlock>
-
-        <Border Margin="0,12,0,0"
-                Padding="14,12"
-                CornerRadius="6"
-                BorderThickness="1"
-                BorderBrush="{DynamicResource Overlay.Accent}"
-                Background="{DynamicResource Overlay.SurfaceRaised}"
-                Visibility="{Binding IsFormOpen, Converter={StaticResource BoolToVisibility}}">
-            <StackPanel>
-                <TextBlock Text="{Binding FormTitle}" FontWeight="SemiBold" FontSize="13" />
-
-                <StackPanel Orientation="Horizontal" Margin="0,8,0,0" Visibility="{Binding HasConfigHosts, Converter={StaticResource BoolToVisibility}}">
-                    <TextBlock Margin="0,0,12,0" VerticalAlignment="Center">
-                        <Run Text="From" />
-                        <Run Text="~/.ssh/config:" FontFamily="{DynamicResource Overlay.MonoFont}" FontSize="11" />
-                    </TextBlock>
-                    <ListBox ItemsSource="{Binding ConfigHosts}"
-                             SelectedItem="{Binding SelectedConfigHost}"
-                             Background="Transparent"
-                             BorderThickness="0"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                        <ListBox.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel />
-                            </ItemsPanelTemplate>
-                        </ListBox.ItemsPanel>
-                        <ListBox.ItemContainerStyle>
-                            <Style TargetType="ListBoxItem">
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate TargetType="ListBoxItem">
-                                            <RadioButton Style="{StaticResource ChoiceRadio}"
-                                                         Content="{Binding DisplayName}"
-                                                         IsChecked="{Binding IsSelected, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" />
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </Style>
-                        </ListBox.ItemContainerStyle>
-                    </ListBox>
-                </StackPanel>
-
-                <Grid Margin="0,10,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="130" />
-                        <ColumnDefinition Width="10" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="10" />
-                        <ColumnDefinition Width="110" />
-                        <ColumnDefinition Width="10" />
-                        <ColumnDefinition Width="60" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0">
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="Name" />
-                        <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="Host name or alias" />
-                        <TextBox Text="{Binding Hostname, UpdateSourceTrigger=PropertyChanged}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="4">
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="User" />
-                        <TextBox Text="{Binding User, UpdateSourceTrigger=PropertyChanged}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="6">
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="Port" />
-                        <TextBox Text="{Binding Port, UpdateSourceTrigger=PropertyChanged}" />
-                    </StackPanel>
-                </Grid>
-
-                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                    <TextBlock Text="Sign in with" VerticalAlignment="Center" Margin="0,0,14,0" />
-                    <RadioButton Style="{StaticResource ChoiceRadio}" Content="SSH agent" GroupName="ServerAuthentication" IsChecked="{Binding UsesAgent}" />
-                    <RadioButton Style="{StaticResource ChoiceRadio}" Content="Key file" GroupName="ServerAuthentication" IsChecked="{Binding UsesKeyFile}" />
-                    <RadioButton Style="{StaticResource ChoiceRadio}" Content="Password" GroupName="ServerAuthentication" IsChecked="{Binding UsesPassword}" />
-                </StackPanel>
-
-                <!-- Each sign-in method shows only what it needs. -->
-                <TextBlock Style="{DynamicResource Overlay.Hint}"
-                           Margin="0,6,0,0"
-                           TextWrapping="Wrap"
-                           TextTrimming="None"
-                           Text="Uses the keys from your SSH agent or ~/.ssh/config, like a terminal would."
-                           Visibility="{Binding UsesAgent, Converter={StaticResource BoolToVisibility}}" />
-
-                <StackPanel Margin="0,8,0,0" Visibility="{Binding UsesKeyFile, Converter={StaticResource BoolToVisibility}}">
-                    <TextBlock Style="{StaticResource FieldLabel}" Text="Private key file" />
-                    <DockPanel>
-                        <Button DockPanel.Dock="Right" Content="Browse …" Margin="8,0,0,0" Click="OnBrowseKeyFile" />
-                        <TextBox Text="{Binding KeyFile, UpdateSourceTrigger=PropertyChanged}" FontFamily="{DynamicResource Overlay.MonoFont}" />
-                    </DockPanel>
-                    <TextBlock Style="{DynamicResource Overlay.Hint}"
-                               Margin="0,4,0,0"
-                               TextWrapping="Wrap"
-                               TextTrimming="None"
-                               Text="The key must not need a passphrase, or its passphrase must be loaded in the SSH agent." />
-                </StackPanel>
-
-                <StackPanel Margin="0,8,0,0" Visibility="{Binding UsesPassword, Converter={StaticResource BoolToVisibility}}">
-                    <TextBlock Style="{StaticResource FieldLabel}" Text="Password for the user above" />
-                    <Grid Width="260" HorizontalAlignment="Left">
-                        <PasswordBox x:Name="PasswordInput" PasswordChanged="OnPasswordChanged" />
-                        <!-- The stored password is never loaded into the page; dots show that there is one. -->
-                        <TextBlock Text="••••••••••••"
-                                   Margin="8,0,0,0"
-                                   VerticalAlignment="Center"
-                                   IsHitTestVisible="False"
-                                   Foreground="{DynamicResource Overlay.TextMuted}"
-                                   Visibility="{Binding ShowStoredPasswordPlaceholder, Converter={StaticResource BoolToVisibility}}" />
-                    </Grid>
-                    <TextBlock Style="{DynamicResource Overlay.Hint}"
-                               Margin="0,4,0,0"
-                               TextWrapping="Wrap"
-                               TextTrimming="None"
-                               Text="Stored in the Windows Credential Manager, not in the JSON file. Where the host allows it, a key is the safer choice." />
-                </StackPanel>
-
-                <Grid Margin="0,10,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="10" />
-                        <ColumnDefinition Width="130" />
-                        <ColumnDefinition Width="10" />
-                        <ColumnDefinition Width="80" />
-                        <ColumnDefinition Width="10" />
-                        <ColumnDefinition Width="80" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0">
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="Services to watch (systemd), separated by commas" />
-                        <TextBox Text="{Binding ServicesText, UpdateSourceTrigger=PropertyChanged}" FontFamily="{DynamicResource Overlay.MonoFont}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="Check interval" />
-                        <ComboBox ItemsSource="{Binding HostIntervals}" SelectedItem="{Binding SelectedInterval}" DisplayMemberPath="DisplayName" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="4">
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="Disk yellow %" />
-                        <TextBox Text="{Binding DiskWarningPercent}" FontFamily="{DynamicResource Overlay.MonoFont}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="6">
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="Disk red %" />
-                        <TextBox Text="{Binding DiskErrorPercent}" FontFamily="{DynamicResource Overlay.MonoFont}" />
-                    </StackPanel>
-                </Grid>
-
-                <TextBlock Style="{DynamicResource Overlay.Hint}" Margin="0,4,0,0" TextWrapping="Wrap" TextTrimming="None">
-                    <Run Text="Example:" />
-                    <Run Text="docker, nginx, postgresql" FontFamily="{DynamicResource Overlay.MonoFont}" Foreground="{DynamicResource Overlay.Text}" />
-                    <Run Text="– the names you would pass to" />
-                    <Run Text="systemctl status" FontFamily="{DynamicResource Overlay.MonoFont}" />
-                    <Run Text="on the host. Leave empty to watch none." />
-                </TextBlock>
-
-                <CheckBox Margin="0,10,0,0"
-                          Content="Paused (not checked)"
-                          IsChecked="{Binding IsPaused}"
-                          Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}" />
-
-                <TextBlock Text="{Binding FormStatus}" TextWrapping="Wrap" FontSize="11" Margin="0,10,0,0">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="Foreground" Value="{DynamicResource Overlay.Text}" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsFormError}" Value="True">
-                                    <Setter Property="Foreground" Value="{DynamicResource Overlay.Danger}" />
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding FormStatus}" Value="">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                </TextBlock>
-
-                <DockPanel Margin="0,12,0,0">
-                    <Button DockPanel.Dock="Right"
-                            Style="{StaticResource LinkButton}"
-                            Content="Remove host"
-                            VerticalAlignment="Center"
-                            Command="{Binding RemoveHostCommand}"
-                            Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}" />
-                    <StackPanel Orientation="Horizontal">
-                        <Button Style="{DynamicResource Overlay.PrimaryButton}" Content="Connect and check" Command="{Binding ConnectAndCheckCommand}" />
-                        <Button Content="Save without checking"
-                                Margin="8,0,0,0"
-                                Command="{Binding SaveUncheckedCommand}"
-                                Visibility="{Binding CanSaveUnchecked, Converter={StaticResource BoolToVisibility}}" />
-                        <Button Content="Cancel" Margin="8,0,0,0" Command="{Binding CancelFormCommand}" />
-                    </StackPanel>
-                </DockPanel>
-            </StackPanel>
-        </Border>
     </StackPanel>
 </UserControl>

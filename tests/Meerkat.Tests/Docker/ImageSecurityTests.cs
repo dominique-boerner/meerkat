@@ -672,7 +672,7 @@ public sealed class ImageSecurityTests
         settings.Security.Ignored.Add(new IgnoredVulnerability { Id = "CVE-2026-0002", Package = "libexpat1" });
         var page = new DockerSettingsPageViewModel(settings);
 
-        Assert.Equal("Manage ignored vulnerabilities (2)", page.IgnoredLinkText);
+        Assert.Equal("Ignored vulnerabilities (2)", page.IgnoredLinkText);
         page.RestoreIgnoredCommand.Execute(page.Ignored[0]);
         page.SelectedThreshold = page.Thresholds.Single(option => option.Threshold == ReportThreshold.High);
         page.DailyScanTime = " 7:05 ";
@@ -689,48 +689,44 @@ public sealed class ImageSecurityTests
         Assert.False(security.SkipOnBattery);
         Assert.False(security.ScanLocalImages);
         Assert.Equal("CVE-2026-0002", Assert.Single(security.Ignored).Id);
-        Assert.Equal("Manage ignored vulnerabilities (1)", page.IgnoredLinkText);
+        Assert.Equal("Ignored vulnerabilities (1)", page.IgnoredLinkText);
     }
 
     [Fact]
-    public void A_time_that_is_none_is_not_saved()
+    public void A_time_that_is_none_is_pointed_out_and_not_stored()
     {
-        var page = new DockerSettingsPageViewModel(new DockerWidgetSettings()) { DailyScanTime = "noon" };
+        var page = new DockerSettingsPageViewModel(new DockerWidgetSettings());
+        var changes = 0;
+        page.Changed += (_, _) => changes++;
 
-        Assert.Throws<InvalidOperationException>(() => page.ToSettings());
-    }
+        page.DailyScanTime = "noon";
 
-    [Fact]
-    public void The_settings_list_this_computer_and_every_host()
-    {
-        var settings = new DockerWidgetSettings();
-        settings.RemoteHosts.Add(new DockerHost { Name = "build", Address = "build.example.org", ScanImages = true });
-        var page = new DockerSettingsPageViewModel(settings);
+        Assert.NotNull(page.DailyScanTimeError);
+        Assert.Equal(0, changes);
+        Assert.Equal("12:30", page.ToSettings().Security.DailyScanTime);
 
-        Assert.Equal(["This computer", "build"], page.Systems.Select(system => system.Name));
-        Assert.Equal("read-only · scanned", page.Systems[1].AccessText);
-
-        page.RemoveHostCommand.Execute(page.RemoteHosts[0]);
-        Assert.Equal(["This computer"], page.Systems.Select(system => system.Name));
+        page.DailyScanTime = "6:45";
+        Assert.Null(page.DailyScanTimeError);
+        Assert.Equal(1, changes);
+        Assert.Equal("06:45", page.ToSettings().Security.DailyScanTime);
     }
 
     [Fact]
     public async Task Installing_a_scanner_from_the_settings_switches_scanning_on_for_that_system()
     {
-        var host = new DockerHost { Name = "build", Address = "build.example.org" };
         var scanner = new FakeImageScanner { Info = null };
-        var system = new DockerSystemViewModel(host, scanner, installed => installed.Host!.ScanImages = true);
+        var switchedOn = false;
+        var status = new ScannerStatusViewModel(scanner, () => switchedOn = true);
 
-        await system.DetectAsync();
-        Assert.Equal("no scanner", system.ScannerText);
-        Assert.True(system.CanInstall);
+        await status.DetectAsync();
+        Assert.Equal("no scanner", status.Text);
+        Assert.True(status.CanInstall);
 
-        await system.InstallCommand.ExecuteAsync(null);
+        await status.InstallCommand.ExecuteAsync(null);
 
-        Assert.Equal("Trivy 0.76.2 installed", system.ScannerText);
-        Assert.False(system.CanInstall);
-        Assert.True(host.ScanImages);
-        Assert.Equal("read-only · scanned", system.AccessText);
+        Assert.Equal("Trivy 0.76.2", status.Text);
+        Assert.False(status.CanInstall);
+        Assert.True(switchedOn);
     }
 
     private SecuritySourceViewModel CreateSource(bool isRemote = false, string id = ContainerSourceOptions.LocalId) => new(

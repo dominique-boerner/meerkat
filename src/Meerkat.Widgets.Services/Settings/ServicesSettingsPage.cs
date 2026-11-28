@@ -10,20 +10,12 @@ namespace Meerkat.Widgets.Services.Settings;
 
 public sealed class ServicesSettingsPage(ServicesSettingsSource settingsSource, IServiceChecker checker) : IWidgetSettingsPage
 {
-    private ServicesSettingsPageViewModel? _viewModel;
-
     public FrameworkElement CreateView()
     {
-        _viewModel = new ServicesSettingsPageViewModel(settingsSource.Current, checker);
-        return new ServicesSettingsView { DataContext = _viewModel };
-    }
-
-    public void Apply()
-    {
-        if (_viewModel is not null)
-        {
-            settingsSource.Update(_viewModel.ToSettings());
-        }
+        // A service is stored the moment it is added, changed or removed; the form in between is only a draft.
+        var viewModel = new ServicesSettingsPageViewModel(settingsSource.Current, checker);
+        viewModel.Endpoints.CollectionChanged += (_, _) => settingsSource.Update(viewModel.ToSettings());
+        return new ServicesSettingsView { DataContext = viewModel };
     }
 }
 

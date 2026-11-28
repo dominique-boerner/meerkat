@@ -11,28 +11,12 @@ namespace Meerkat.Widgets.Git.Settings;
 
 public sealed class GitSettingsPage(GitSettingsSource settingsSource, IGitProviderFactory providerFactory) : IWidgetSettingsPage
 {
-    private GitSettingsPageViewModel? _viewModel;
-
     public FrameworkElement CreateView()
     {
-        _viewModel = new GitSettingsPageViewModel(settingsSource, providerFactory);
-        return new GitSettingsView { DataContext = _viewModel };
-    }
-
-    public void Apply()
-    {
-        if (_viewModel is null)
-        {
-            return;
-        }
-
-        var settings = _viewModel.ToSettings();
-        if (_viewModel.IsTokenRemovalRequested)
-        {
-            settingsSource.RemoveToken(settings);
-        }
-
-        settingsSource.Update(settings, _viewModel.Token);
+        // The token is not among what is stored here: it is stored once a connection proved it works.
+        var viewModel = new GitSettingsPageViewModel(settingsSource, providerFactory);
+        viewModel.Changed += (_, _) => settingsSource.Update(viewModel.ToSettings(), newToken: null);
+        return new GitSettingsView { DataContext = viewModel };
     }
 }
 
@@ -82,10 +66,6 @@ public sealed partial class GitSettingsPageViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(ShowStoredTokenPlaceholder))]
     private bool _hasStoredToken;
 
-    /// <summary>The stored token is deleted when the settings are saved.</summary>
-    [ObservableProperty]
-    private bool _isTokenRemovalRequested;
-
     [ObservableProperty]
     private bool _onlyMyBranches;
 
@@ -122,6 +102,9 @@ public sealed partial class GitSettingsPageViewModel : ObservableObject
         // without the user having to ask for them.
         Initialization = _hasStoredToken ? ConnectAsync() : Task.CompletedTask;
     }
+
+    /// <summary>Raised when something that is stored was changed.</summary>
+    public event EventHandler? Changed;
 
     /// <summary>Completes when the automatic connection attempt made while opening the page has finished.</summary>
     public Task Initialization { get; }
@@ -166,27 +149,27 @@ public sealed partial class GitSettingsPageViewModel : ObservableObject
     [RelayCommand]
     private void RemoveToken()
     {
-        IsTokenRemovalRequested = true;
+        _settingsSource.RemoveToken(ToSettings());
         HasStoredToken = false;
         Token = string.Empty;
         ConnectionState = GitConnectionState.NotConnected;
-        ConnectionStatus = "The token will be removed when you save.";
+        ConnectionStatus = "The token was removed.";
+
+        // The widget still works with the token it was started with; announcing the settings makes it let go.
+        Changed?.Invoke(this, EventArgs.Empty);
     }
+
+    partial void OnOnlyMyBranchesChanged(bool value) => Changed?.Invoke(this, EventArgs.Empty);
+
+    partial void OnIntervalSecondsChanged(double value) => Changed?.Invoke(this, EventArgs.Empty);
+
+    partial void OnServerUrlChanged(string value) => Changed?.Invoke(this, EventArgs.Empty);
 
     partial void OnProjectFilterChanged(string value)
     {
         foreach (var option in Projects)
         {
             option.IsVisible = value.Length == 0 || option.Project.Name.Contains(value.Trim(), StringComparison.OrdinalIgnoreCase);
-        }
-    }
-
-    partial void OnTokenChanged(string value)
-    {
-        // Entering a token takes back an earlier request to remove it.
-        if (value.Length > 0)
-        {
-            IsTokenRemovalRequested = false;
         }
     }
 
@@ -197,7 +180,7 @@ public sealed partial class GitSettingsPageViewModel : ObservableObject
         try
         {
             var settings = ToSettings();
-            var token = string.IsNullOrWhiteSpace(Token) && !IsTokenRemovalRequested ? _settingsSource.ReadToken(settings) : Token;
+            var token = string.IsNullOrWhiteSpace(Token) ? _settingsSource.ReadToken(settings) : Token;
             using var provider = _providerFactory.Create(settings, token)
                 ?? throw new GitProviderException(GitFailureKind.Unauthorized, "Enter an access token first.");
 
@@ -215,6 +198,14 @@ public sealed partial class GitSettingsPageViewModel : ObservableObject
             OnProjectFilterChanged(ProjectFilter);
             ConnectionState = GitConnectionState.Connected;
             ConnectionStatus = $"Connected as {userName}";
+
+            // A token that just proved itself is kept; one that failed never reaches the secret store.
+            if (!string.IsNullOrWhiteSpace(Token))
+            {
+                _settingsSource.Update(settings, Token);
+                HasStoredToken = true;
+                Token = string.Empty;
+            }
         }
         catch (Exception exception)
         {
@@ -233,6 +224,7 @@ public sealed partial class GitSettingsPageViewModel : ObservableObject
             if (e.PropertyName == nameof(ProjectOptionViewModel.IsSelected))
             {
                 OnPropertyChanged(nameof(ProjectsSummary));
+                Changed?.Invoke(this, EventArgs.Empty);
             }
         };
         Projects.Add(option);
@@ -257,9 +249,9 @@ public sealed partial class GitSettingsPageViewModel : ObservableObject
 
         // Tokens are stored per provider and server, so the other provider may or may not have one.
         HasStoredToken = !string.IsNullOrEmpty(_settingsSource.ReadToken(ToSettings()));
-        IsTokenRemovalRequested = false;
         ConnectionState = GitConnectionState.NotConnected;
         ConnectionStatus = string.Empty;
         OnPropertyChanged(nameof(ProjectsSummary));
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 }

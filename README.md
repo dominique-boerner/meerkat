@@ -124,14 +124,40 @@ lines; a double-click on the edge restores the default. Both actions are also av
 
 ### Configuration
 
-Open the settings from the tray icon or the gear button in the panel. You can change the hotkeys,
-whether Meerkat starts when you sign in to Windows, the opacity of the status bar, the monitor
-Meerkat appears on, which widgets are enabled, and the settings each widget contributes. A widget
-that is switched off offers no settings and no hotkeys until it is switched on again; what was set
-for it is kept.
+Open the settings from the tray icon or the gear button in the panel. There is nothing to save:
+every change is stored and applied the moment you make it.
 
-Everything is stored as JSON in `%AppData%\Meerkat\settings.json`. Errors are logged to
+- *General* holds what concerns Meerkat as a whole: starting with Windows, the opacity of the status
+  bar, the monitor Meerkat appears on, all hotkeys, and updates.
+- *Machines* is where other machines are entered, once for all widgets: name, address, user, port
+  and how to sign in. See [Other machines](#other-machines).
+- Every widget has a page of its own, with the switch that turns the widget on and off. A widget
+  that is switched off offers no settings and no hotkeys until it is switched on again; what was set
+  for it is kept.
+
+Everything is stored as JSON in `%AppData%\Meerkat\settings.json`, which *Open settings.json* at the
+bottom of the window opens. A few values are only found there, such as exact polling intervals
+(`CustomListIntervalSeconds` and its siblings) or the number of log lines kept (`MaxLogLines`).
+Meerkat takes over what you save in the file right away. Errors are logged to
 `%AppData%\Meerkat\error.log`.
+
+### Other machines
+
+The Docker and Server widgets reach other machines over SSH, through the OpenSSH client of Windows,
+so your `~/.ssh/config`, the SSH agent and `known_hosts` apply as they do in a terminal. A machine is
+entered once on the *Machines* page of the settings; the pages of the widgets then only choose what
+the machine is used for.
+
+- Hosts from your `~/.ssh/config` are offered by name; for others enter host name, user and port.
+- Meerkat signs in with the keys your SSH agent or configuration provides, with a key file you
+  pick, or with a password. A password is stored in the Windows Credential Manager under
+  `Meerkat:machine/...`, never in `settings.json`; where the machine allows it, a key is the safer
+  choice.
+- *Connect and check* verifies the entries with a first connection. That is also the moment the
+  machine's key is stored in `known_hosts`. Afterwards Meerkat only connects while the key stays the
+  same.
+- Hosts entered in earlier versions, separately for Docker and Server, are moved to this list the
+  first time the new version starts; a host both widgets knew becomes one machine.
 
 ### Updates
 
@@ -141,7 +167,7 @@ SHA-256 checksum. Nothing is installed without your consent:
 
 - A hint below the status bar and a dot on the tray icon show that an update is ready.
 - A card in the panel offers to restart and install now, or to install when Meerkat exits.
-- The *Updates* page of the settings shows the release notes and lets you turn off the automatic
+- The *General* page of the settings shows the release notes and lets you turn off the automatic
   check or the background download and switch to the pre-release channel.
 
 The update check contacts `api.github.com` and `github.com` and sends no data besides the request
@@ -156,19 +182,18 @@ The widget talks to Docker exclusively through `wsl.exe`, for example
 by default the WSL default distribution is used. The user Meerkat runs the commands as must be
 allowed to use Docker without `sudo`.
 
-To see the containers of another machine, add it under *Docker systems* in the same settings.
-Meerkat then runs the docker CLI on that machine through the OpenSSH client of Windows, signing in
-with your SSH agent or configuration, a key file, or a password kept in the Windows Credential
-Manager. Nothing is installed on the host unless you ask for it, and no port besides SSH is used.
+*Refresh* sets how often Docker is asked: *Fast* lists containers every 2 seconds, *Normal* every 5
+and *Economical* every 15. Other machines are asked less often on their own, every 10, 20 or 60
+seconds, because every request opens an SSH connection.
+
+To see the containers of another machine, enter it under [Machines](#other-machines) and add it
+with *+ Machine* on the Docker page. Meerkat then runs the docker CLI on that machine.
+Nothing is installed there unless you ask for it, and no port besides SSH is used.
 
 - The user you sign in with must be allowed to use Docker there, which usually means being in the
   `docker` group. Bear in mind that this is close to root access to the host.
-- *Connect and check* makes the first connection, which is also the moment the host's key is stored
-  in `known_hosts`. Afterwards Meerkat only connects while the key stays the same.
-- A host is read-only by default: you see containers, figures and logs, but cannot start, stop or
-  restart anything. Allow that per host if you want it.
-- Every request opens an SSH connection, so other machines are asked every 20 seconds by default
-  instead of every few seconds.
+- A machine is read-only by default: you see containers, figures and logs, but cannot start, stop or
+  restart anything. Allow that under *Edit* if you want it.
 
 #### Scanning images for vulnerabilities
 
@@ -183,8 +208,8 @@ WSL distribution or another machine, so no image is copied anywhere.
   folder to remove it again.
 - All images are scanned once a day at the time set in the settings, and a new image as soon as it
   appears. This computer is not scanned while it runs on battery unless you ask for a scan.
-- Another machine is only scanned if you switch that on where the machine is edited. A scan takes
-  some of its processor time, which is why it is off by default.
+- Another machine is only scanned if you switch that on under *Edit*. A scan takes some of its
+  processor time, which is why it is off by default.
 - Vulnerabilities from the severity you choose, critical by default, are reported in the status bar,
   together with which images are affected, which version fixes them and, where it can be told,
   whether the base image is the cause. By default only vulnerabilities with an available fix are
@@ -211,19 +236,14 @@ The token is stored in the Windows Credential Manager under `Meerkat:git/...`, n
 
 ### Server widget
 
-Open the settings, choose *Server* and add a host. Hosts from your `~/.ssh/config` are offered by
-name; for others enter host name, user and port. Meerkat signs in with the keys your SSH agent or
-configuration provides, with a key file you pick, or with a password. A password is stored in the
-Windows Credential Manager under `Meerkat:server/...`, never in `settings.json`; where the host
-allows it, a key is the safer choice.
-
-*Connect and check* verifies the entries with a first connection. That is also the moment the host's
-key is stored in `known_hosts`. Afterwards Meerkat only connects while the key stays the same; if it
-changes, the host is blocked and the panel shows the new fingerprint for you to verify.
+Enter the machine under [Machines](#other-machines), then open the *Server* page of the settings
+and add it with *+ Machine*. If the key of a machine changes later, the machine is blocked and the
+panel shows the new fingerprint for you to verify.
 
 Each check is a single SSH call that reads `/proc`, `df` and `systemctl is-active`. Nothing is
-installed or changed on the host. Per host you can list the systemd services to watch, set the check
-interval and the disk usage at which Meerkat shows a hint or an error.
+installed or changed on the machine. Per machine you can list the systemd services to watch and set
+the disk usage at which Meerkat shows a hint or an error. *Refresh* sets how often the machines are
+checked: every 15, 30 or 120 seconds.
 
 ### Services widget
 

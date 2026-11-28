@@ -4,8 +4,8 @@
         xmlns:local="clr-namespace:Meerkat.App.SettingsUi"
         Title="Meerkat – Settings"
         Icon="/Assets/meerkat-app.ico"
-        Width="800"
-        Height="490"
+        Width="820"
+        Height="560"
         WindowStyle="None"
         ResizeMode="NoResize"
         Topmost="True"
@@ -15,14 +15,15 @@
         BorderBrush="{StaticResource Overlay.Border}"
         BorderThickness="1"
         FontFamily="Segoe UI"
-        FontSize="12">
+        FontSize="12"
+        KeyDown="OnKeyDown">
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="36" GlassFrameThickness="0" CornerRadius="0" ResizeBorderThickness="0" />
     </WindowChrome.WindowChrome>
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
         <DataTemplate x:Key="NavigationItemTemplate">
-            <StackPanel Orientation="Horizontal">
+            <StackPanel x:Name="Entry" Orientation="Horizontal">
                 <TextBlock Text="{Binding Title}" />
                 <Ellipse Width="6"
                          Height="6"
@@ -30,6 +31,12 @@
                          Fill="{StaticResource Overlay.Accent}"
                          Visibility="{Binding Badge.HasUpdate, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
             </StackPanel>
+            <DataTemplate.Triggers>
+                <!-- A widget that is switched off stays in the list, where it can be switched on again, but steps back. -->
+                <DataTrigger Binding="{Binding Widget.IsEnabled}" Value="False">
+                    <Setter TargetName="Entry" Property="Opacity" Value="0.5" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
         </DataTemplate>
         <Style TargetType="local:HotkeyBox">
             <Setter Property="Cursor" Value="Hand" />
@@ -87,6 +94,10 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="GroupTitle" TargetType="TextBlock" BasedOn="{StaticResource Overlay.ColumnHeader}">
+            <Setter Property="FontSize" Value="10.5" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
         <Style x:Key="NavigationItem" TargetType="ListBoxItem">
             <Setter Property="Foreground" Value="{StaticResource Overlay.Text}" />
             <Setter Property="Cursor" Value="Hand" />
@@ -126,7 +137,7 @@
                         Content="&#xE8BB;"
                         Width="36"
                         WindowChrome.IsHitTestVisibleInChrome="True"
-                        Click="OnCancelClick" />
+                        Click="OnCloseClick" />
                 <Image Source="/Assets/meerkat-app.ico"
                        Width="18"
                        Height="18"
@@ -139,290 +150,302 @@
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="150" />
+                <ColumnDefinition Width="160" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <ListBox x:Name="Navigation"
-                     Grid.Column="0"
-                     ItemsSource="{Binding NavigationItems}"
-                     ItemContainerStyle="{StaticResource NavigationItem}"
-                     ItemTemplate="{StaticResource NavigationItemTemplate}"
-                     Background="Transparent"
-                     BorderThickness="0"
-                     Margin="10,14,6,0"
-                     SelectedIndex="0"
-                     SelectionChanged="OnNavigationSelectionChanged" />
+            <!-- One entry for the shell, one for the machines, one per widget. -->
+            <Border Grid.Column="0" BorderBrush="{StaticResource Overlay.Border}" BorderThickness="0,0,1,0">
+                <ListBox ItemsSource="{Binding NavigationItems}"
+                         SelectedItem="{Binding SelectedItem}"
+                         ItemContainerStyle="{StaticResource NavigationItem}"
+                         ItemTemplate="{StaticResource NavigationItemTemplate}"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         Margin="10,14,8,0" />
+            </Border>
 
-            <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" Focusable="False">
-                <StackPanel Margin="14,16,20,16">
-
-                    <StackPanel x:Name="HotkeysSection">
-                        <TextBlock Style="{StaticResource Overlay.SectionTitle}" Text="Hotkeys" />
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="162" />
-                                <ColumnDefinition Width="142" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource Overlay.FormLabel}" Text="Open/close panel" />
-                            <local:HotkeyBox Grid.Row="0" Grid.Column="1" Margin="0,5"
-                                             Hotkey="{Binding TogglePanelHotkey}"
-                                             RecordingStarted="OnHotkeyRecordingStarted"
-                                             RecordingStopped="OnHotkeyRecordingStopped" />
-                            <TextBlock Grid.Row="0" Grid.Column="2" Style="{StaticResource Overlay.Hint}" Margin="10,0,0,0" Text="Details and actions" />
-
-                            <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource Overlay.FormLabel}" Text="Show/hide Meerkat" />
-                            <local:HotkeyBox Grid.Row="1" Grid.Column="1" Margin="0,5"
-                                             Hotkey="{Binding ToggleVisibilityHotkey}"
-                                             RecordingStarted="OnHotkeyRecordingStarted"
-                                             RecordingStopped="OnHotkeyRecordingStopped" />
-                            <TextBlock Grid.Row="1" Grid.Column="2" Style="{StaticResource Overlay.Hint}" Margin="10,0,0,0" Text="No polling while hidden" />
-                        </Grid>
-                        <ItemsControl ItemsSource="{Binding WidgetHotkeys}" Focusable="False">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid Visibility="{Binding IsAvailable, Converter={StaticResource BoolToVisibility}}">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="162" />
-                                            <ColumnDefinition Width="142" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Style="{StaticResource Overlay.FormLabel}" Text="{Binding Title}" />
-                                        <local:HotkeyBox Grid.Column="1" Margin="0,5"
-                                                         Hotkey="{Binding Gesture}"
-                                                         RecordingStarted="OnHotkeyRecordingStarted"
-                                                         RecordingStopped="OnHotkeyRecordingStopped" />
-                                        <TextBlock Grid.Column="2" Style="{StaticResource Overlay.Hint}" Margin="10,0,0,0" Text="{Binding WidgetTitle, StringFormat={}{0} widget}" />
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <TextBlock Style="{StaticResource Overlay.Hint}"
-                                   Margin="0,6,0,0"
-                                   Text="Click a field and press the new key combination. Esc keeps the current one." />
-                        <DockPanel Margin="0,4,0,0">
-                            <DockPanel.Style>
-                                <Style TargetType="DockPanel">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding HotkeyWarning}" Value="{x:Null}">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </DockPanel.Style>
-                            <TextBlock DockPanel.Dock="Left"
-                                       Text="&#xE7BA;"
-                                       FontFamily="{StaticResource Overlay.IconFont}"
-                                       Foreground="{StaticResource Overlay.Warning}"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,8,0" />
-                            <TextBlock Text="{Binding HotkeyWarning}" Foreground="{StaticResource Overlay.Warning}" TextWrapping="Wrap" />
-                        </DockPanel>
-                    </StackPanel>
-
-                    <StackPanel x:Name="GeneralSection">
-                        <TextBlock Style="{StaticResource Overlay.SectionTitle}" Text="General" />
-                        <StackPanel Margin="0,0,0,10" Visibility="{Binding CanStartWithWindows, Converter={StaticResource BoolToVisibility}}">
-                            <CheckBox IsChecked="{Binding StartWithWindows}" Content="Start Meerkat when I sign in to Windows" />
-                            <TextBlock Style="{StaticResource Overlay.Hint}" Margin="0,4,0,0" TextWrapping="Wrap"
-                                       Text="Adds Meerkat to your startup apps. If you move Meerkat.exe afterwards, switch this off and on again." />
-                        </StackPanel>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="162" />
-                                <ColumnDefinition Width="142" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource Overlay.FormLabel}" Text="Status bar opacity" />
-                            <Slider Grid.Row="0" Grid.Column="1" Margin="0,8"
-                                    Minimum="0.2" Maximum="1" LargeChange="0.1" SmallChange="0.01"
-                                    Value="{Binding Opacity}" />
-                            <TextBlock Grid.Row="0" Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center"
-                                       FontFamily="{StaticResource Overlay.MonoFont}" Text="{Binding OpacityText}" />
-
-                            <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource Overlay.FormLabel}" Text="Monitor" />
-                            <ComboBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,5" Width="230" HorizontalAlignment="Left"
-                                      ItemsSource="{Binding Monitors}"
-                                      SelectedItem="{Binding SelectedMonitor}"
-                                      DisplayMemberPath="DisplayName" />
-                        </Grid>
-                        <TextBlock Style="{StaticResource Overlay.Hint}" Margin="162,2,0,0" Text="Status bar and panel appear on this monitor" />
-                        <TextBlock Style="{StaticResource Overlay.Hint}" Margin="162,8,0,0" TextWrapping="Wrap"
-                                   Text="To move the status bar, drag it by the handle at its end. Its place is remembered relative to the screen, so it fits every monitor." />
-                    </StackPanel>
-
-                    <StackPanel x:Name="WidgetsSection">
-                        <TextBlock Style="{StaticResource Overlay.SectionTitle}" Text="Widgets" />
-                        <ItemsControl ItemsSource="{Binding Widgets}" Focusable="False">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border BorderBrush="{StaticResource Overlay.Border}" BorderThickness="1" CornerRadius="4" Padding="12,8" Margin="0,0,0,6">
-                                        <DockPanel>
-                                            <CheckBox IsChecked="{Binding IsEnabled}" VerticalAlignment="Center">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
-                                                    <TextBlock Text="{Binding TypeName}"
-                                                               Style="{StaticResource Overlay.Hint}"
-                                                               FontFamily="{StaticResource Overlay.MonoFont}"
-                                                               Margin="10,0,0,0" />
-                                                </StackPanel>
-                                            </CheckBox>
-                                        </DockPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-
-                    <ItemsControl x:Name="WidgetSections" ItemsSource="{Binding WidgetSections}" Focusable="False">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource Overlay.SectionTitle}" Text="{Binding Title}" />
-                                    <ContentPresenter Content="{Binding View}" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-
-                    <Grid x:Name="UpdatesSection">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel Grid.Column="0">
-                            <StackPanel DataContext="{Binding Update}">
-                                <DockPanel>
-                                    <Image DockPanel.Dock="Left"
-                                           Source="/Assets/meerkat-app.ico"
-                                           Width="44"
-                                           Height="44"
-                                           RenderOptions.BitmapScalingMode="HighQuality"
-                                           Margin="0,0,14,0" />
-                                    <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Headline}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                        <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Overlay.Hint}" />
-                                    </StackPanel>
-                                </DockPanel>
-
-                                <DockPanel Margin="0,14,0,0"
-                                           Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}">
-                                    <TextBlock DockPanel.Dock="Right"
-                                               Text="{Binding ProgressText}"
-                                               FontFamily="{StaticResource Overlay.MonoFont}"
-                                               FontSize="11"
-                                               Margin="10,0,0,0"
-                                               Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" />
-                                    <TextBlock Text="{Binding StatusText}" Style="{StaticResource Overlay.Hint}" TextWrapping="Wrap" TextTrimming="None" />
-                                </DockPanel>
-                                <ProgressBar Style="{StaticResource Overlay.Meter}"
-                                             Height="4"
-                                             Margin="0,6,0,0"
-                                             Maximum="100"
-                                             Value="{Binding ProgressPercent, Mode=OneWay}"
-                                             Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" />
-
-                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                                    <Button Style="{StaticResource Overlay.PrimaryButton}"
-                                            Content="Restart and install"
-                                            Margin="0,0,8,0"
-                                            Command="{Binding RestartAndInstallCommand}"
-                                            Visibility="{Binding IsInstallActionVisible, Converter={StaticResource BoolToVisibility}}" />
-                                    <Button Content="Install on exit"
-                                            Margin="0,0,8,0"
-                                            Command="{Binding InstallOnExitCommand}"
-                                            Visibility="{Binding IsReady, Converter={StaticResource BoolToVisibility}}" />
-                                    <Button Content="Cancel"
-                                            Margin="0,0,8,0"
-                                            Command="{Binding CancelDownloadCommand}"
-                                            Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" />
-                                    <Button Style="{StaticResource Overlay.PrimaryButton}"
-                                            Content="Download"
-                                            Margin="0,0,8,0"
-                                            Command="{Binding DownloadCommand}"
-                                            Visibility="{Binding CanDownload, Converter={StaticResource BoolToVisibility}}" />
-                                    <Button Content="Check now"
-                                            Command="{Binding CheckNowCommand}"
-                                            Visibility="{Binding CanCheck, Converter={StaticResource BoolToVisibility}}" />
-                                </StackPanel>
-                            </StackPanel>
-
-                            <CheckBox Margin="0,20,0,0"
-                                      Content="Check for updates automatically (at startup and every 24 h)"
-                                      IsChecked="{Binding CheckForUpdatesAutomatically}" />
-                            <CheckBox Margin="0,10,0,0"
-                                      Content="Download in the background"
-                                      IsChecked="{Binding DownloadUpdatesInBackground}" />
-                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                                <TextBlock Style="{StaticResource Overlay.FormLabel}" Text="Channel" Margin="0,0,12,0" />
-                                <ComboBox Width="130"
-                                          ItemsSource="{Binding Channels}"
-                                          SelectedItem="{Binding SelectedChannel}"
-                                          DisplayMemberPath="DisplayName" />
-                            </StackPanel>
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="1"
-                                    Width="230"
-                                    Margin="20,0,0,0"
-                                    DataContext="{Binding Update}"
-                                    Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVisibility}}">
-                            <TextBlock Text="{Binding ReleaseNotesTitle}" FontWeight="SemiBold" />
-                            <Border Height="170"
-                                    Margin="0,8,0,8"
-                                    Padding="10,8"
-                                    CornerRadius="4"
-                                    BorderThickness="1"
-                                    BorderBrush="{StaticResource Overlay.Border}"
-                                    Background="{StaticResource Overlay.SurfaceRaised}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
-                                    <TextBlock Text="{Binding ReleaseNotes}" TextWrapping="Wrap" FontSize="11" />
-                                </ScrollViewer>
-                            </Border>
-                            <Button Style="{StaticResource LinkButton}"
-                                    Content="Full release notes"
-                                    HorizontalAlignment="Left"
-                                    Command="{Binding OpenReleaseNotesCommand}" />
-                        </StackPanel>
-                    </Grid>
-                </StackPanel>
-            </ScrollViewer>
-        </Grid>
-
-        <!-- Footer -->
-        <Border Grid.Row="2" BorderBrush="{StaticResource Overlay.Border}" BorderThickness="0,1,0,0" Padding="16,12">
-            <DockPanel>
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                    <Button Content="Cancel" MinWidth="88" IsCancel="True" Click="OnCancelClick" />
-                    <Button Content="Save" MinWidth="88" Margin="8,0,0,0" Style="{StaticResource Overlay.PrimaryButton}" Click="OnSaveClick" />
-                </StackPanel>
-                <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-                    <TextBlock Style="{StaticResource Overlay.Hint}"
-                               FontFamily="{StaticResource Overlay.MonoFont}"
-                               FontSize="10"
-                               Text="{Binding SettingsFilePath}" />
-                    <TextBlock Text="{Binding ErrorMessage}" Foreground="{StaticResource Overlay.Danger}" TextWrapping="Wrap">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock">
+            <DockPanel Grid.Column="1">
+                <DockPanel DockPanel.Dock="Top" Margin="22,18,22,14">
+                    <!-- A widget is switched on and off where it is configured. -->
+                    <CheckBox DockPanel.Dock="Right" VerticalAlignment="Center" Content="Widget active" IsChecked="{Binding SelectedWidget.IsEnabled}">
+                        <CheckBox.Style>
+                            <Style TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ErrorMessage}" Value="{x:Null}">
+                                    <DataTrigger Binding="{Binding SelectedWidget}" Value="{x:Null}">
                                         <Setter Property="Visibility" Value="Collapsed" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
-                </StackPanel>
+                        </CheckBox.Style>
+                    </CheckBox>
+                    <TextBlock Text="{Binding PageTitle}" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </DockPanel>
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+                    <StackPanel Margin="22,0,22,18">
+
+                        <StackPanel Visibility="{Binding IsGeneralSelected, Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel Orientation="Horizontal" Visibility="{Binding CanStartWithWindows, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,16">
+                                <CheckBox IsChecked="{Binding StartWithWindows}" Content="Start Meerkat when I sign in to Windows" />
+                                <ContentControl Style="{StaticResource Overlay.Info}" ToolTip="{Binding AutostartInfo}" />
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                <TextBlock Style="{StaticResource GroupTitle}" Text="STATUS BAR" />
+                                <ContentControl Style="{StaticResource Overlay.Info}" ToolTip="{Binding MonitorInfo}" />
+                            </StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="170" />
+                                    <ColumnDefinition Width="190" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource Overlay.FormLabel}" Text="Opacity" />
+                                <Slider Grid.Row="0" Grid.Column="1" Margin="0,8"
+                                        Minimum="0.2" Maximum="1" LargeChange="0.1" SmallChange="0.01"
+                                        Value="{Binding Opacity}" />
+                                <TextBlock Grid.Row="0" Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center"
+                                           FontFamily="{StaticResource Overlay.MonoFont}" Text="{Binding OpacityText}" />
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource Overlay.FormLabel}" Text="Monitor" />
+                                <ComboBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,5" Width="250" HorizontalAlignment="Left"
+                                          ItemsSource="{Binding Monitors}"
+                                          SelectedItem="{Binding SelectedMonitor}"
+                                          DisplayMemberPath="DisplayName" />
+                            </Grid>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,20,0,4">
+                                <TextBlock Style="{StaticResource GroupTitle}" Text="HOTKEYS" />
+                                <ContentControl Style="{StaticResource Overlay.Info}" ToolTip="{Binding HotkeyInfo}" />
+                            </StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="170" />
+                                    <ColumnDefinition Width="190" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource Overlay.FormLabel}" Text="Open/close panel" />
+                                <local:HotkeyBox Grid.Row="0" Grid.Column="1" Margin="0,5"
+                                                 Hotkey="{Binding TogglePanelHotkey}"
+                                                 RecordingStarted="OnHotkeyRecordingStarted"
+                                                 RecordingStopped="OnHotkeyRecordingStopped" />
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource Overlay.FormLabel}" Text="Show/hide Meerkat" />
+                                <local:HotkeyBox Grid.Row="1" Grid.Column="1" Margin="0,5"
+                                                 Hotkey="{Binding ToggleVisibilityHotkey}"
+                                                 RecordingStarted="OnHotkeyRecordingStarted"
+                                                 RecordingStopped="OnHotkeyRecordingStopped" />
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding WidgetHotkeys}" Focusable="False">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Visibility="{Binding IsAvailable, Converter={StaticResource BoolToVisibility}}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="170" />
+                                                <ColumnDefinition Width="190" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Style="{StaticResource Overlay.FormLabel}" Text="{Binding Title}" />
+                                            <local:HotkeyBox Grid.Column="1" Margin="0,5"
+                                                             Hotkey="{Binding Gesture}"
+                                                             RecordingStarted="OnHotkeyRecordingStarted"
+                                                             RecordingStopped="OnHotkeyRecordingStopped" />
+                                            <TextBlock Grid.Column="2" Style="{StaticResource Overlay.Hint}" Margin="10,0,0,0" Text="{Binding WidgetTitle}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <DockPanel Margin="0,4,0,0">
+                                <DockPanel.Style>
+                                    <Style TargetType="DockPanel">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HotkeyWarning}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DockPanel.Style>
+                                <TextBlock DockPanel.Dock="Left"
+                                           Text="&#xE7BA;"
+                                           FontFamily="{StaticResource Overlay.IconFont}"
+                                           Foreground="{StaticResource Overlay.Warning}"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0" />
+                                <TextBlock Text="{Binding HotkeyWarning}" Foreground="{StaticResource Overlay.Warning}" TextWrapping="Wrap" />
+                            </DockPanel>
+
+                            <TextBlock Style="{StaticResource GroupTitle}" Text="UPDATES" Margin="0,20,0,8" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0">
+                                    <StackPanel DataContext="{Binding Update}">
+                                        <DockPanel>
+                                            <Image DockPanel.Dock="Left"
+                                                   Source="/Assets/meerkat-app.ico"
+                                                   Width="36"
+                                                   Height="36"
+                                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                                   Margin="0,0,12,0" />
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Headline}" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Overlay.Hint}" />
+                                            </StackPanel>
+                                        </DockPanel>
+
+                                        <DockPanel Margin="0,12,0,0"
+                                                   Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock DockPanel.Dock="Right"
+                                                       Text="{Binding ProgressText}"
+                                                       FontFamily="{StaticResource Overlay.MonoFont}"
+                                                       FontSize="11"
+                                                       Margin="10,0,0,0"
+                                                       Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" />
+                                            <TextBlock Text="{Binding StatusText}" Style="{StaticResource Overlay.Hint}" TextWrapping="Wrap" TextTrimming="None" />
+                                        </DockPanel>
+                                        <ProgressBar Style="{StaticResource Overlay.Meter}"
+                                                     Height="4"
+                                                     Margin="0,6,0,0"
+                                                     Maximum="100"
+                                                     Value="{Binding ProgressPercent, Mode=OneWay}"
+                                                     Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" />
+
+                                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                            <Button Style="{StaticResource Overlay.PrimaryButton}"
+                                                    Content="Restart and install"
+                                                    Margin="0,0,8,0"
+                                                    Command="{Binding RestartAndInstallCommand}"
+                                                    Visibility="{Binding IsInstallActionVisible, Converter={StaticResource BoolToVisibility}}" />
+                                            <Button Content="Install on exit"
+                                                    Margin="0,0,8,0"
+                                                    Command="{Binding InstallOnExitCommand}"
+                                                    Visibility="{Binding IsReady, Converter={StaticResource BoolToVisibility}}" />
+                                            <Button Content="Cancel"
+                                                    Margin="0,0,8,0"
+                                                    Command="{Binding CancelDownloadCommand}"
+                                                    Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" />
+                                            <Button Style="{StaticResource Overlay.PrimaryButton}"
+                                                    Content="Download"
+                                                    Margin="0,0,8,0"
+                                                    Command="{Binding DownloadCommand}"
+                                                    Visibility="{Binding CanDownload, Converter={StaticResource BoolToVisibility}}" />
+                                            <Button Content="Check now"
+                                                    Command="{Binding CheckNowCommand}"
+                                                    Visibility="{Binding CanCheck, Converter={StaticResource BoolToVisibility}}" />
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <CheckBox Margin="0,16,0,0"
+                                              Content="Check for updates automatically (at startup and every 24 h)"
+                                              IsChecked="{Binding CheckForUpdatesAutomatically}" />
+                                    <CheckBox Margin="0,8,0,0"
+                                              Content="Download in the background"
+                                              IsChecked="{Binding DownloadUpdatesInBackground}" />
+                                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                        <TextBlock Style="{StaticResource Overlay.FormLabel}" Text="Channel" Margin="0,0,12,0" />
+                                        <ComboBox Width="130"
+                                                  ItemsSource="{Binding Channels}"
+                                                  SelectedItem="{Binding SelectedChannel}"
+                                                  DisplayMemberPath="DisplayName" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1"
+                                            Width="230"
+                                            Margin="20,0,0,0"
+                                            DataContext="{Binding Update}"
+                                            Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Text="{Binding ReleaseNotesTitle}" FontWeight="SemiBold" />
+                                    <Border Height="150"
+                                            Margin="0,8,0,8"
+                                            Padding="10,8"
+                                            CornerRadius="4"
+                                            BorderThickness="1"
+                                            BorderBrush="{StaticResource Overlay.Border}"
+                                            Background="{StaticResource Overlay.SurfaceRaised}">
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+                                            <TextBlock Text="{Binding ReleaseNotes}" TextWrapping="Wrap" FontSize="11" />
+                                        </ScrollViewer>
+                                    </Border>
+                                    <Button Style="{StaticResource LinkButton}"
+                                            Content="Full release notes"
+                                            HorizontalAlignment="Left"
+                                            Command="{Binding OpenReleaseNotesCommand}" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+
+                        <Border Visibility="{Binding IsMachinesSelected, Converter={StaticResource BoolToVisibility}}">
+                            <local:MachinesView DataContext="{Binding Machines}" />
+                        </Border>
+
+                        <!-- The pages of the widgets; only the one that is selected shows. -->
+                        <ItemsControl ItemsSource="{Binding NavigationItems}" Focusable="False">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibility}}">
+                                        <ContentPresenter x:Name="Page" Content="{Binding Widget.View}" />
+                                        <TextBlock x:Name="SwitchedOff" Style="{StaticResource Overlay.Hint}" Visibility="Collapsed"
+                                                   Text="The widget is switched off. Its settings are kept and return when you switch it on." />
+                                        <TextBlock x:Name="NothingToSet" Style="{StaticResource Overlay.Hint}" Visibility="Collapsed"
+                                                   Text="This widget has nothing to set." />
+                                    </StackPanel>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding Widget.HasView}" Value="False">
+                                            <Setter TargetName="NothingToSet" Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Widget.IsEnabled}" Value="False">
+                                            <Setter TargetName="Page" Property="Visibility" Value="Collapsed" />
+                                            <Setter TargetName="NothingToSet" Property="Visibility" Value="Collapsed" />
+                                            <Setter TargetName="SwitchedOff" Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
+        </Grid>
+
+        <!-- Footer: nothing to save, so it only says so and leads to the file behind it all. -->
+        <Border Grid.Row="2" BorderBrush="{StaticResource Overlay.Border}" BorderThickness="0,1,0,0" Padding="16,10">
+            <DockPanel>
+                <Button DockPanel.Dock="Right"
+                        Style="{StaticResource LinkButton}"
+                        FontFamily="{StaticResource Overlay.MonoFont}"
+                        FontSize="11"
+                        VerticalAlignment="Center"
+                        Content="Open settings.json"
+                        ToolTip="{Binding SettingsFileInfo}"
+                        Command="{Binding OpenFileCommand}" />
+                <TextBlock VerticalAlignment="Center" Margin="0,0,12,0" TextWrapping="Wrap">
+                    <TextBlock.Style>
+                        <!-- What could not be stored takes the place of the reassurance that everything is. -->
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Text" Value="{Binding ErrorMessage}" />
+                            <Setter Property="Foreground" Value="{StaticResource Overlay.Danger}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ErrorMessage}" Value="{x:Null}">
+                                    <Setter Property="Text" Value="Changes are applied immediately" />
+                                    <Setter Property="Foreground" Value="{StaticResource Overlay.TextMuted}" />
+                                    <Setter Property="FontSize" Value="11" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
             </DockPanel>
         </Border>
     </Grid>

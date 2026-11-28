@@ -234,7 +234,7 @@ public class ServerProbeTests
         await probe.ProbeAsync(host, HostKeyPolicy.AcceptNew, CancellationToken.None, "typed");
 
         Assert.Equal(["stored", "typed"], ssh.Targets.Select(target => target.Password));
-        Assert.Equal($"server/{host.Id}", host.SecretKey);
+        Assert.Equal($"machine/{host.Id}", host.SecretKey);
     }
 
     [Fact]

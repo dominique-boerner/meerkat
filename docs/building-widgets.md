@@ -230,9 +230,27 @@ settingsStore.Save("disk", settings);
 ```
 
 To let users edit them, return an `IWidgetSettingsPage` from `SettingsPage`. The shell embeds the
-view returned by `CreateView()` as a page of the settings window and calls `Apply()` when the user
-saves. `CreateView()` is called every time the settings window opens and must return a fresh view
-that reflects the stored values.
+view returned by `CreateView()` as the widget's page of the settings window, next to the switch that
+turns the widget on and off. `CreateView()` is called every time the settings window opens and must
+return a fresh view that reflects the stored values.
+
+The settings window has no save button, so a page stores every change itself:
+
+- Save as soon as a value is complete and valid, and let the widget follow at once. A choice or a
+  check box is complete when it changes; a text field when it loses the focus or holds a valid value.
+- Do not store what is not valid yet. Say next to the field what is wrong and keep the value stored
+  last until it is right.
+- Something that takes several fields, such as a new entry of a list, is a draft until the user
+  confirms it; store the list then.
+- Keep explanations out of the page. Put them into the tooltip of a small info symbol next to the
+  label: `<ContentControl Style="{DynamicResource Overlay.Info}" ToolTip="…" />`.
+
+The settings file can also be edited by hand while Meerkat runs. `IWidgetSettingsStore.Reloaded` is
+raised when that happened; load your settings again then instead of keeping the object you had.
+
+A widget that reaches other machines over SSH does not keep their addresses itself. Request
+`MachineRegistry` from `Meerkat.Ssh`, store only the ids of the machines you use together with what
+you do with them, and let the user choose among the machines on your page.
 
 ## Styling
 

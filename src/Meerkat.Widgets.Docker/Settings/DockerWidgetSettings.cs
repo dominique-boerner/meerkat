@@ -75,7 +75,43 @@ public sealed class DockerSecuritySettings
     };
 }
 
-/// <summary>A Docker instance on another machine, reached by running the docker CLI there over SSH.</summary>
+/// <summary>How often Docker is asked. The user picks a pace; what it means in seconds is decided here.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<RefreshRate>))]
+public enum RefreshRate
+{
+    Fast,
+    Normal,
+    Economical,
+}
+
+/// <summary>What the Docker widget does with one of the machines the user entered.</summary>
+public sealed class DockerMachineUse
+{
+    /// <summary>The id of the machine in the list all widgets share.</summary>
+    public string MachineId { get; set; } = string.Empty;
+
+    public bool ShowContainers { get; set; } = true;
+
+    /// <summary>
+    /// Whether containers on this machine may be started, stopped and restarted from Meerkat. Off unless the
+    /// user switches it on: a slip of the mouse matters more on a server than on the own machine.
+    /// </summary>
+    public bool AllowActions { get; set; }
+
+    /// <summary>
+    /// Whether the images of this machine are scanned for vulnerabilities. Off unless the user switches it on:
+    /// a scan takes processor time that a server may need for the work it is there for.
+    /// </summary>
+    public bool ScanImages { get; set; }
+
+    /// <summary>Seconds between two requests; null follows the pace chosen for the widget. Only set by hand in the settings file.</summary>
+    public double? IntervalSeconds { get; set; }
+}
+
+/// <summary>
+/// A Docker instance on another machine, reached by running the docker CLI there over SSH: a machine of
+/// the shared list together with what this widget does with it.
+/// </summary>
 public sealed class DockerHost
 {
     public const double DefaultIntervalSeconds = 20;
@@ -97,24 +133,30 @@ public sealed class DockerHost
 
     public double IntervalSeconds { get; set; } = DefaultIntervalSeconds;
 
-    /// <summary>
-    /// Whether containers on this host may be started, stopped and restarted from Meerkat. Off unless the
-    /// user switches it on: a slip of the mouse matters more on a server than on the own machine.
-    /// </summary>
     public bool AllowActions { get; set; }
 
-    /// <summary>
-    /// Whether the images of this host are scanned for vulnerabilities. Off unless the user switches it on:
-    /// a scan takes processor time that a server may need for the work it is there for.
-    /// </summary>
     public bool ScanImages { get; set; }
 
-    /// <summary>Key under which the password is kept in the secret store.</summary>
+    /// <summary>Key under which the machine's password is kept in the secret store.</summary>
     [JsonIgnore]
-    public string SecretKey => $"docker/{Id}";
+    public string SecretKey => $"machine/{Id}";
 
     [JsonIgnore]
     public string DisplayName => string.IsNullOrWhiteSpace(Name) ? Address : Name;
+
+    public static DockerHost From(SshMachine machine, DockerMachineUse use, double defaultIntervalSeconds) => new()
+    {
+        Id = machine.Id,
+        Name = machine.Name,
+        Address = machine.Address,
+        User = machine.User,
+        Port = machine.Port,
+        Authentication = machine.Authentication,
+        KeyFile = machine.KeyFile,
+        IntervalSeconds = use.IntervalSeconds ?? defaultIntervalSeconds,
+        AllowActions = use.AllowActions,
+        ScanImages = use.ScanImages,
+    };
 
     public SshTarget ToTarget(string? password) => new(
         Address.Trim(),
@@ -141,13 +183,36 @@ public sealed class DockerWidgetSettings
     /// <summary>WSL distribution name; null or empty uses the default distribution.</summary>
     public string? Distribution { get; set; }
 
-    public double ListIntervalSeconds { get; set; } = 5;
+    public RefreshRate Refresh { get; set; } = RefreshRate.Normal;
 
-    public double StatsIntervalSeconds { get; set; } = 3;
+    /// <summary>
+    /// Seconds between two requests, for whoever wants other figures than <see cref="Refresh"/> stands for.
+    /// Not offered in the settings window; set them in the settings file.
+    /// </summary>
+    public double? CustomListIntervalSeconds { get; set; }
 
+    public double? CustomStatsIntervalSeconds { get; set; }
+
+    /// <summary>For other machines, which are asked less often because every request opens a connection.</summary>
+    public double? CustomRemoteIntervalSeconds { get; set; }
+
+    /// <summary>Not offered in the settings window: hardly anybody needs another figure.</summary>
     public int MaxLogLines { get; set; } = DefaultMaxLogLines;
 
+    /// <summary>Which of the shared machines the widget uses, and for what.</summary>
+    public List<DockerMachineUse> Machines { get; set; } = [];
+
+    /// <summary>
+    /// The machines of <see cref="Machines"/> with all that is needed to reach them, put together by
+    /// <see cref="DockerSettingsSource"/>. Not stored: the connection belongs to the shared list.
+    /// </summary>
+    [JsonIgnore]
     public List<DockerHost> RemoteHosts { get; set; } = [];
+
+    /// <summary>Hosts as the widget stored them before machines were shared; taken over into the shared list once.</summary>
+    [JsonPropertyName("RemoteHosts")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<DockerHost>? LegacyRemoteHosts { get; set; }
 
     /// <summary>Ids of the sources whose section the user folded up on the Docker page.</summary>
     public List<string> CollapsedSources { get; set; } = [];
@@ -158,10 +223,28 @@ public sealed class DockerWidgetSettings
         double.IsFinite(host.IntervalSeconds) ? Math.Max(MinimumRemoteIntervalSeconds, host.IntervalSeconds) : DockerHost.DefaultIntervalSeconds);
 
     [JsonIgnore]
-    public TimeSpan ListInterval => ToInterval(ListIntervalSeconds);
+    public TimeSpan ListInterval => ToInterval(CustomListIntervalSeconds ?? Refresh switch
+    {
+        RefreshRate.Fast => 2,
+        RefreshRate.Economical => 15,
+        _ => 5,
+    });
 
     [JsonIgnore]
-    public TimeSpan StatsInterval => ToInterval(StatsIntervalSeconds);
+    public TimeSpan StatsInterval => ToInterval(CustomStatsIntervalSeconds ?? Refresh switch
+    {
+        RefreshRate.Fast => 2,
+        RefreshRate.Economical => 10,
+        _ => 3,
+    });
+
+    [JsonIgnore]
+    public double RemoteIntervalSeconds => CustomRemoteIntervalSeconds ?? Refresh switch
+    {
+        RefreshRate.Fast => 10,
+        RefreshRate.Economical => 60,
+        _ => DockerHost.DefaultIntervalSeconds,
+    };
 
     [JsonIgnore]
     public int EffectiveMaxLogLines => Math.Clamp(MaxLogLines, MinimumLogLines, MaximumLogLines);

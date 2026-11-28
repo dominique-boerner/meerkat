@@ -27,6 +27,7 @@ public static class DockerWidgetServiceCollectionExtensions
 
         // Shared with other widgets that reach machines over SSH; whoever registers first provides it.
         services.TryAddSingleton<ISshClient, OpenSshClient>();
+        services.TryAddSingleton<MachineRegistry>();
         services.AddSingleton<IDockerShellFactory, DockerShellFactory>();
         services.AddSingleton<IScanStore>(_ => new FileScanStore(FileScanStore.DefaultPath));
         services.AddSingleton(provider =>

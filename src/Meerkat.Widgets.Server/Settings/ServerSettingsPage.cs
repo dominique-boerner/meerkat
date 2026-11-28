@@ -1,452 +1,357 @@
 using System.Collections.ObjectModel;
-using System.Globalization;
+using System.ComponentModel;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Meerkat.Abstractions;
-using Meerkat.Widgets.Server.Monitoring;
 using Meerkat.Ssh;
+using Meerkat.Widgets.Server.Monitoring;
 using Meerkat.Widgets.Server.Views;
 
 namespace Meerkat.Widgets.Server.Settings;
 
-public sealed class ServerSettingsPage(ServerSettingsSource settingsSource, IServerProbe probe, IWidgetSecretStore secrets) : IWidgetSettingsPage
+public sealed class ServerSettingsPage : IWidgetSettingsPage
 {
+    private readonly ServerSettingsSource _settingsSource;
+    private readonly IServerProbe _probe;
+    private readonly MachineRegistry _machines;
     private ServerSettingsPageViewModel? _viewModel;
+
+    public ServerSettingsPage(ServerSettingsSource settingsSource, IServerProbe probe, MachineRegistry machines)
+    {
+        _settingsSource = settingsSource;
+        _probe = probe;
+        _machines = machines;
+
+        // A machine entered while the settings are open is offered here right away.
+        machines.Changed += (_, _) => _viewModel?.SetMachines(machines.Machines);
+    }
 
     public FrameworkElement CreateView()
     {
-        _viewModel = new ServerSettingsPageViewModel(
-            settingsSource.Current,
-            probe,
-            SshConfigFile.ReadHostAliases(SshConfigFile.DefaultPath),
-            host => !string.IsNullOrEmpty(secrets.Read(host.SecretKey)));
-        return new ServerSettingsView { DataContext = _viewModel };
+        var viewModel = new ServerSettingsPageViewModel(_settingsSource.Current, _machines.Machines, _probe);
+        viewModel.Changed += (_, _) => _settingsSource.Update(viewModel.ToSettings());
+        _viewModel = viewModel;
+        return new ServerSettingsView { DataContext = viewModel };
+    }
+}
+
+/// <summary>One of the shared machines and what the Server widget watches on it.</summary>
+public sealed partial class ServerMachineOptionViewModel : ObservableObject
+{
+    private readonly ServerMachineUse _use;
+    private readonly IServerProbe? _probe;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Summary))]
+    private string _servicesText;
+
+    [ObservableProperty]
+    private double _diskWarningPercent;
+
+    [ObservableProperty]
+    private double _diskErrorPercent;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Summary))]
+    private bool _isPaused;
+
+    /// <summary>True while the details of the machine are shown for editing.</summary>
+    [ObservableProperty]
+    private bool _isOpen;
+
+    /// <summary>What keeps the entries from being stored; null while they are fine.</summary>
+    [ObservableProperty]
+    private string? _error;
+
+    /// <summary>What the last check of the connection found.</summary>
+    [ObservableProperty]
+    private string _checkResult = string.Empty;
+
+    [ObservableProperty]
+    private bool _isCheckFailed;
+
+    public ServerMachineOptionViewModel(SshMachine machine, ServerMachineUse use, IServerProbe? probe)
+    {
+        Machine = machine;
+        _use = use;
+        _probe = probe;
+        _servicesText = string.Join(", ", use.Services);
+        _diskWarningPercent = use.DiskWarningPercent;
+        _diskErrorPercent = use.DiskErrorPercent;
+        _isPaused = use.IsPaused;
     }
 
-    public void Apply()
+    public SshMachine Machine { get; }
+
+    public string Name => Machine.DisplayName;
+
+    public string Destination => Machine.Destination;
+
+    public string Summary => IsPaused ? "paused"
+        : Services.Count == 0 ? "no services"
+        : string.Join(", ", Services);
+
+    public bool IsValid => Error is null;
+
+    private List<string> Services =>
+        [.. ServicesText.Split([',', ' ', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+
+    public bool CanCheck => _probe is not null;
+
+    public ServerMachineUse ToUse() => new()
     {
-        if (_viewModel is null)
+        MachineId = Machine.Id,
+        Services = Services,
+        IntervalSeconds = _use.IntervalSeconds,
+        DiskWarningPercent = DiskWarningPercent,
+        DiskErrorPercent = DiskErrorPercent,
+        IsPaused = IsPaused,
+    };
+
+    protected override void OnPropertyChanged(PropertyChangedEventArgs e)
+    {
+        // Judged before anybody hears of the change, so that listeners already know whether it may be stored.
+        if (e.PropertyName is nameof(ServicesText) or nameof(DiskWarningPercent) or nameof(DiskErrorPercent))
+        {
+            Error = Validate();
+        }
+
+        base.OnPropertyChanged(e);
+    }
+
+    [RelayCommand]
+    private void ToggleOpen() => IsOpen = !IsOpen;
+
+    /// <summary>Connects once and tells what was found, so that a mistyped service shows before it is missed.</summary>
+    [RelayCommand]
+    private async Task CheckAsync()
+    {
+        if (_probe is null)
         {
             return;
         }
 
-        // Passwords travel separately from the settings: they go to the secret store, never into the file.
-        var settings = _viewModel.ToSettings();
-        foreach (var (hostId, password) in _viewModel.PendingPasswords)
-        {
-            if (settings.Hosts.FirstOrDefault(host => host.Id == hostId) is { } host)
-            {
-                secrets.Write(host.SecretKey, password);
-            }
-        }
+        var use = ToUse();
 
-        var obsolete = settingsSource.Current.Hosts
-            .Where(previous => settings.Hosts.FirstOrDefault(host => host.Id == previous.Id) is not { Authentication: SshAuthentication.Password });
-        foreach (var host in obsolete)
+        IsCheckFailed = false;
+        CheckResult = "Connecting …";
+        try
         {
-            secrets.Delete(host.SecretKey);
+            var snapshot = await _probe.ProbeAsync(ServerHost.From(Machine, use), HostKeyPolicy.Strict, CancellationToken.None);
+            var inactive = snapshot.Services.Where(service => !service.IsActive).Select(service => service.Name).ToList();
+            CheckResult = inactive.Count == 0
+                ? $"Connected ({snapshot.OsName})."
+                : $"Connected ({snapshot.OsName}). Not active: {string.Join(", ", inactive)}.";
         }
-
-        settingsSource.Update(settings);
+        catch (Exception exception)
+        {
+            IsCheckFailed = true;
+            CheckResult = exception.Message;
+        }
     }
-}
 
-/// <param name="Seconds">Null stands for the widget's default interval.</param>
-public sealed record IntervalOption(double? Seconds, string DisplayName)
-{
-    public static string Describe(double seconds) => seconds >= 60 && seconds % 60 == 0
-        ? $"every {(seconds / 60).ToString("0", CultureInfo.CurrentCulture)} min"
-        : $"every {seconds.ToString("0", CultureInfo.CurrentCulture)} s";
-}
+    private string? Validate()
+    {
+        if (!double.IsFinite(DiskWarningPercent) || !double.IsFinite(DiskErrorPercent) || DiskWarningPercent > DiskErrorPercent)
+        {
+            return "The yellow disk threshold must not be above the red one.";
+        }
 
-/// <param name="Alias">Null stands for entering the connection by hand.</param>
-public sealed record ConfigHostOption(string? Alias, string DisplayName);
-
-public sealed class HostRowViewModel(ServerHost host)
-{
-    public ServerHost Host { get; } = host;
-
-    public string Name => Host.Name;
-
-    public string Address => Host.Address;
-
-    public bool IsPaused => Host.IsPaused;
-
-    public string IntervalText => Host.IsPaused ? "paused"
-        : Host.IntervalSeconds is { } seconds ? IntervalOption.Describe(seconds)
-        : "Default";
-
-    public string ServicesText => Host.Services.Count == 0 ? "–" : string.Join(", ", Host.Services);
+        try
+        {
+            ServerProbe.BuildScript(Services);
+            return null;
+        }
+        catch (Exception exception) when (exception is ArgumentException or ProbeException)
+        {
+            return exception.Message;
+        }
+    }
 }
 
 public sealed partial class ServerSettingsPageViewModel : ObservableObject
 {
-    private static readonly double[] IntervalChoices = [15, 30, 60, 300, 900];
+    private readonly IServerProbe? _probe;
+    private IReadOnlyList<SshMachine> _allMachines = [];
 
-    private readonly IServerProbe _probe;
-    private readonly Func<ServerHost, bool> _isPasswordStored;
-    private readonly Dictionary<string, string> _pendingPasswords = [];
+    // Not edited here, but part of the settings this page writes back as a whole.
+    private readonly ServerWidgetSettings _original;
 
-    /// <summary>The host being edited; null while a new one is entered.</summary>
-    private ServerHost? _editedHost;
-
-    [ObservableProperty]
-    private IntervalOption _defaultInterval;
+    // While the page fills itself in, nothing the user did has changed.
+    private readonly bool _isLoading = true;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(FormTitle))]
-    private bool _isFormOpen;
+    [NotifyPropertyChangedFor(nameof(IsFast), nameof(IsNormal), nameof(IsEconomical))]
+    private RefreshRate _refresh;
 
+    /// <summary>True while the machines that can be added are offered for choosing.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(FormTitle))]
-    private bool _isEditing;
+    private bool _isPickerOpen;
 
-    [ObservableProperty]
-    private ConfigHostOption _selectedConfigHost;
-
-    [ObservableProperty]
-    private string _name = string.Empty;
-
-    [ObservableProperty]
-    private string _hostname = string.Empty;
-
-    [ObservableProperty]
-    private string _user = string.Empty;
-
-    [ObservableProperty]
-    private string _port = string.Empty;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(UsesAgent))]
-    [NotifyPropertyChangedFor(nameof(UsesKeyFile))]
-    [NotifyPropertyChangedFor(nameof(UsesPassword))]
-    private SshAuthentication _authentication;
-
-    [ObservableProperty]
-    private string _keyFile = string.Empty;
-
-    /// <summary>A newly entered password; empty keeps the stored one.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowStoredPasswordPlaceholder))]
-    private string _password = string.Empty;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowStoredPasswordPlaceholder))]
-    private bool _hasStoredPassword;
-
-    [ObservableProperty]
-    private string _servicesText = string.Empty;
-
-    [ObservableProperty]
-    private IntervalOption _selectedInterval;
-
-    [ObservableProperty]
-    private double _diskWarningPercent = 85;
-
-    [ObservableProperty]
-    private double _diskErrorPercent = 95;
-
-    [ObservableProperty]
-    private bool _isPaused;
-
-    [ObservableProperty]
-    private string _formStatus = string.Empty;
-
-    [ObservableProperty]
-    private bool _isFormError;
-
-    /// <summary>Set after a failed check, to offer adding the host anyway.</summary>
-    [ObservableProperty]
-    private bool _canSaveUnchecked;
-
-    [ObservableProperty]
-    private string _lastCheckResult = string.Empty;
-
-    /// <param name="hasStoredPassword">Tells whether a password is already stored for a host.</param>
-    public ServerSettingsPageViewModel(
-        ServerWidgetSettings settings,
-        IServerProbe probe,
-        IReadOnlyList<string> configAliases,
-        Func<ServerHost, bool> hasStoredPassword)
+    /// <param name="machines">The machines all widgets share; the page chooses which of them this widget watches.</param>
+    /// <param name="probe">Used to check a machine on request; without it no check is offered.</param>
+    public ServerSettingsPageViewModel(ServerWidgetSettings settings, IReadOnlyList<SshMachine> machines, IServerProbe? probe = null)
     {
+        _original = settings;
         _probe = probe;
-        _isPasswordStored = hasStoredPassword;
+        _refresh = settings.Refresh;
+        SetMachines(machines);
+        _isLoading = false;
+    }
 
-        DefaultIntervals = [.. IntervalChoices.Select(seconds => new IntervalOption(seconds, IntervalOption.Describe(seconds)))];
-        _defaultInterval = DefaultIntervals.FirstOrDefault(option => option.Seconds == settings.DefaultIntervalSeconds)
-            ?? AddOption(DefaultIntervals, settings.DefaultIntervalSeconds);
+    /// <summary>Raised when something that is stored was changed and is valid.</summary>
+    public event EventHandler? Changed;
 
-        HostIntervals = [new IntervalOption(null, "Default"), .. IntervalChoices.Select(seconds => new IntervalOption(seconds, IntervalOption.Describe(seconds)))];
-        _selectedInterval = HostIntervals[0];
+    /// <summary>The machines the widget watches.</summary>
+    public ObservableCollection<ServerMachineOptionViewModel> Machines { get; } = [];
 
-        var manual = new ConfigHostOption(null, "manual");
-        ConfigHosts = [.. configAliases.Select(alias => new ConfigHostOption(alias, alias)), manual];
-        _selectedConfigHost = manual;
+    /// <summary>The machines of the shared list the widget does not watch yet; offered by "+ Machine".</summary>
+    public ObservableCollection<SshMachine> AvailableMachines { get; } = [];
 
-        foreach (var host in settings.Hosts)
+    // One property per choice. Each only reacts to being selected; deselecting follows from the others.
+    public bool IsFast
+    {
+        get => Refresh == RefreshRate.Fast;
+        set => Select(value, RefreshRate.Fast);
+    }
+
+    public bool IsNormal
+    {
+        get => Refresh == RefreshRate.Normal;
+        set => Select(value, RefreshRate.Normal);
+    }
+
+    public bool IsEconomical
+    {
+        get => Refresh == RefreshRate.Economical;
+        set => Select(value, RefreshRate.Economical);
+    }
+
+    public bool HasMachines => Machines.Count > 0;
+
+    public bool CanAddMachine => AvailableMachines.Count > 0;
+
+    /// <summary>Says why there is nothing to add, where that is the case.</summary>
+    public string? AddMachineHint => CanAddMachine ? null
+        : _allMachines.Count == 0 ? "Enter a machine on the Machines page first."
+        : "Every machine is listed already. Enter more on the Machines page.";
+
+    public string RefreshInfo =>
+        "How often the machines are checked: every 15, 30 or 120 seconds. Every check opens an SSH connection. Another figure, also per machine, can be set in settings.json.";
+
+    public string MachinesInfo =>
+        "Machines are entered once, on the Machines page; \"+ Machine\" adds one of them here. For services, enter the names you would pass to \"systemctl status\" on the machine, such as docker, nginx, postgresql; leave the field empty to watch none. The disk thresholds say from which fill level a disk is shown yellow or red.";
+
+    /// <summary>Takes over the shared machines as they are now, keeping what was entered for those that stay.</summary>
+    public void SetMachines(IReadOnlyList<SshMachine> machines)
+    {
+        var chosen = _isLoading ? _original.Machines : [.. Machines.Select(option => option.ToUse())];
+        var open = Machines.Where(option => option.IsOpen).Select(option => option.Machine.Id).ToHashSet();
+        _allMachines = machines;
+
+        foreach (var option in Machines)
         {
-            Hosts.Add(new HostRowViewModel(host.Clone()));
+            option.PropertyChanged -= OnMachineChanged;
         }
+
+        Machines.Clear();
+        foreach (var use in chosen)
+        {
+            // A machine that was removed from the shared list is gone here as well.
+            if (machines.FirstOrDefault(machine => machine.Id == use.MachineId) is { } machine)
+            {
+                Add(machine, use).IsOpen = open.Contains(machine.Id);
+            }
+        }
+
+        RefreshAvailable();
     }
-
-    public List<IntervalOption> DefaultIntervals { get; }
-
-    public List<IntervalOption> HostIntervals { get; }
-
-    /// <summary>Hosts from ~/.ssh/config, followed by the option to enter one by hand.</summary>
-    public IReadOnlyList<ConfigHostOption> ConfigHosts { get; }
-
-    public bool HasConfigHosts => ConfigHosts.Count > 1;
-
-    public ObservableCollection<HostRowViewModel> Hosts { get; } = [];
-
-    /// <summary>Passwords entered in this session by host id; written to the secret store when the settings are saved.</summary>
-    public IReadOnlyDictionary<string, string> PendingPasswords => _pendingPasswords;
-
-    // One property per radio button. Each only reacts to being selected; deselecting follows from the others.
-    public bool UsesAgent
-    {
-        get => Authentication == SshAuthentication.Agent;
-        set => Select(value, SshAuthentication.Agent);
-    }
-
-    public bool UsesKeyFile
-    {
-        get => Authentication == SshAuthentication.KeyFile;
-        set => Select(value, SshAuthentication.KeyFile);
-    }
-
-    public bool UsesPassword
-    {
-        get => Authentication == SshAuthentication.Password;
-        set => Select(value, SshAuthentication.Password);
-    }
-
-    /// <summary>The stored password is never read back into the page; dots stand in for it.</summary>
-    public bool ShowStoredPasswordPlaceholder => HasStoredPassword && Password.Length == 0;
-
-    public string FormTitle => IsEditing ? "Edit host" : "Add host";
 
     public ServerWidgetSettings ToSettings() => new()
     {
-        DefaultIntervalSeconds = DefaultInterval.Seconds ?? 30,
-        Hosts = [.. Hosts.Select(row => row.Host)],
+        Refresh = Refresh,
+        CustomIntervalSeconds = _original.CustomIntervalSeconds,
+        Machines = [.. Machines.Select(option => option.ToUse())],
     };
 
+    /// <summary>Lets the widget watch one of the shared machines.</summary>
     [RelayCommand]
-    private void AddHost()
+    private void AddMachine(SshMachine machine)
     {
-        _editedHost = null;
-        LoadForm(new ServerHost(), isEditing: false);
-    }
-
-    [RelayCommand]
-    private void EditHost(HostRowViewModel row)
-    {
-        _editedHost = row.Host;
-        LoadForm(row.Host, isEditing: true);
-    }
-
-    [RelayCommand]
-    private void CancelForm() => IsFormOpen = false;
-
-    [RelayCommand]
-    private void RemoveHost()
-    {
-        if (Hosts.FirstOrDefault(row => row.Host == _editedHost) is { } row)
-        {
-            Hosts.Remove(row);
-            _pendingPasswords.Remove(row.Host.Id);
-        }
-
-        IsFormOpen = false;
-    }
-
-    /// <summary>Connects once to verify the entries, then adds the host or applies the changes.</summary>
-    [RelayCommand]
-    private async Task ConnectAndCheckAsync()
-    {
-        if (!TryBuildHost(out var host))
+        IsPickerOpen = false;
+        if (Machines.Any(option => option.Machine.Id == machine.Id))
         {
             return;
         }
 
-        IsFormError = false;
-        CanSaveUnchecked = false;
-        FormStatus = "Connecting …";
-        try
-        {
-            // Adding a host is the explicit decision to trust it, so its key is accepted on first contact.
-            // A key that differs from a stored one is still refused.
-            var password = Password.Length > 0 ? Password : _pendingPasswords.GetValueOrDefault(host.Id);
-            var snapshot = await _probe.ProbeAsync(host, HostKeyPolicy.AcceptNew, CancellationToken.None, password);
-            var inactive = snapshot.Services.Where(service => !service.IsActive).Select(service => service.Name).ToList();
-            Commit(host);
-            LastCheckResult = inactive.Count == 0
-                ? $"{host.Name}: connected ({snapshot.OsName})."
-                : $"{host.Name}: connected ({snapshot.OsName}). Not active: {string.Join(", ", inactive)}.";
-        }
-        catch (Exception exception)
-        {
-            IsFormError = true;
-            CanSaveUnchecked = true;
-            FormStatus = exception.Message;
-        }
+        // Opened right away: whoever adds a machine will want to say what to watch on it.
+        Add(machine, new ServerMachineUse { MachineId = machine.Id }).IsOpen = true;
+        RefreshAvailable();
+        RaiseChanged();
     }
 
+    /// <summary>Takes the machine off this widget; it stays on the shared list.</summary>
     [RelayCommand]
-    private void SaveUnchecked()
+    private void RemoveMachine(ServerMachineOptionViewModel option)
     {
-        if (TryBuildHost(out var host))
+        option.PropertyChanged -= OnMachineChanged;
+        Machines.Remove(option);
+        RefreshAvailable();
+        if (Machines.All(remaining => remaining.IsValid))
         {
-            Commit(host);
+            RaiseChanged();
         }
     }
 
-    partial void OnSelectedConfigHostChanged(ConfigHostOption value)
+    partial void OnRefreshChanged(RefreshRate value) => RaiseChanged();
+
+    private ServerMachineOptionViewModel Add(SshMachine machine, ServerMachineUse use)
     {
-        // An alias carries its own user, port and key in ~/.ssh/config, so those fields stay empty.
-        if (value.Alias is { } alias)
+        var option = new ServerMachineOptionViewModel(machine, use, _probe);
+        option.PropertyChanged += OnMachineChanged;
+        Machines.Add(option);
+        return option;
+    }
+
+    private void RefreshAvailable()
+    {
+        AvailableMachines.Clear();
+        foreach (var machine in _allMachines.Where(machine => Machines.All(option => option.Machine.Id != machine.Id)))
         {
-            Name = alias;
-            Hostname = alias;
-            User = string.Empty;
-            Port = string.Empty;
-            Authentication = SshAuthentication.Agent;
+            AvailableMachines.Add(machine);
+        }
+
+        OnPropertyChanged(nameof(HasMachines));
+        OnPropertyChanged(nameof(CanAddMachine));
+        OnPropertyChanged(nameof(AddMachineHint));
+    }
+
+    private void OnMachineChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        // Entries that are no good yet are not stored; what was stored last stays until they are.
+        if (e.PropertyName is nameof(ServerMachineOptionViewModel.ServicesText)
+                or nameof(ServerMachineOptionViewModel.DiskWarningPercent) or nameof(ServerMachineOptionViewModel.DiskErrorPercent)
+                or nameof(ServerMachineOptionViewModel.IsPaused)
+            && Machines.All(option => option.IsValid))
+        {
+            RaiseChanged();
         }
     }
 
-    private void Select(bool isSelected, SshAuthentication authentication)
+    private void RaiseChanged()
+    {
+        if (!_isLoading)
+        {
+            Changed?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void Select(bool isSelected, RefreshRate rate)
     {
         if (isSelected)
         {
-            Authentication = authentication;
+            Refresh = rate;
         }
-    }
-
-    private void LoadForm(ServerHost host, bool isEditing)
-    {
-        SelectedConfigHost = ConfigHosts[^1];
-        Name = host.Name;
-        Hostname = host.Address;
-        User = host.User ?? string.Empty;
-        Port = host.Port?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
-        Authentication = host.Authentication;
-        KeyFile = host.KeyFile ?? string.Empty;
-        Password = string.Empty;
-        HasStoredPassword = isEditing && (_pendingPasswords.ContainsKey(host.Id) || _isPasswordStored(host));
-        ServicesText = string.Join(", ", host.Services);
-        SelectedInterval = HostIntervals.FirstOrDefault(option => option.Seconds == host.IntervalSeconds)
-            ?? AddOption(HostIntervals, host.IntervalSeconds ?? 30);
-        DiskWarningPercent = host.DiskWarningPercent;
-        DiskErrorPercent = host.DiskErrorPercent;
-        IsPaused = host.IsPaused;
-        FormStatus = string.Empty;
-        IsFormError = false;
-        CanSaveUnchecked = false;
-        IsEditing = isEditing;
-        IsFormOpen = true;
-
-        // The form's controls may have been created while it was hidden; announce the selection once more
-        // so that exactly one sign-in method shows as selected.
-        OnPropertyChanged(nameof(UsesAgent));
-        OnPropertyChanged(nameof(UsesKeyFile));
-        OnPropertyChanged(nameof(UsesPassword));
-    }
-
-    private bool TryBuildHost(out ServerHost host)
-    {
-        host = new ServerHost
-        {
-            Id = _editedHost?.Id ?? Guid.NewGuid().ToString("N"),
-            Address = Hostname.Trim(),
-            User = string.IsNullOrWhiteSpace(User) ? null : User.Trim(),
-            Authentication = Authentication,
-            KeyFile = UsesKeyFile && !string.IsNullOrWhiteSpace(KeyFile) ? KeyFile.Trim() : null,
-            Services = [.. ServicesText.Split([',', ' ', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)],
-            IntervalSeconds = SelectedInterval.Seconds,
-            DiskWarningPercent = DiskWarningPercent,
-            DiskErrorPercent = DiskErrorPercent,
-            IsPaused = IsPaused,
-        };
-        host.Name = string.IsNullOrWhiteSpace(Name) ? host.Address : Name.Trim();
-
-        string? error = null;
-        if (string.IsNullOrWhiteSpace(Port))
-        {
-            host.Port = null;
-        }
-        else if (int.TryParse(Port, NumberStyles.None, CultureInfo.InvariantCulture, out var port))
-        {
-            host.Port = port;
-        }
-        else
-        {
-            error = "The port must be a number.";
-        }
-
-        if (error is null && host.DiskWarningPercent > host.DiskErrorPercent)
-        {
-            error = "The yellow disk threshold must not be above the red one.";
-        }
-
-        if (error is null && UsesPassword && Password.Length == 0 && !HasStoredPassword)
-        {
-            error = "Enter the password.";
-        }
-
-        if (error is null)
-        {
-            try
-            {
-                host.ToTarget().Validate();
-                ServerProbe.BuildScript(host.Services);
-            }
-            catch (Exception exception) when (exception is ArgumentException or ProbeException)
-            {
-                error = exception.Message;
-            }
-        }
-
-        IsFormError = error is not null;
-        FormStatus = error ?? string.Empty;
-        CanSaveUnchecked = false;
-        return error is null;
-    }
-
-    private void Commit(ServerHost host)
-    {
-        if (UsesPassword && Password.Length > 0)
-        {
-            _pendingPasswords[host.Id] = Password;
-        }
-        else if (!UsesPassword)
-        {
-            _pendingPasswords.Remove(host.Id);
-        }
-
-        var index = Hosts.ToList().FindIndex(row => row.Host == _editedHost);
-        if (index >= 0)
-        {
-            Hosts[index] = new HostRowViewModel(host);
-        }
-        else
-        {
-            Hosts.Add(new HostRowViewModel(host));
-        }
-
-        _editedHost = null;
-        Password = string.Empty;
-        FormStatus = string.Empty;
-        LastCheckResult = string.Empty;
-        IsFormOpen = false;
-    }
-
-    private static IntervalOption AddOption(List<IntervalOption> options, double seconds)
-    {
-        var option = new IntervalOption(seconds, IntervalOption.Describe(seconds));
-        options.Add(option);
-        return option;
     }
 }

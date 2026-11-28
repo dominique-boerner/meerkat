@@ -40,7 +40,7 @@ public sealed class SettingsServiceTests : IDisposable
         var service = new SettingsService(FilePath);
         service.Current.Opacity = 0.5;
         service.Current.Monitor = @"\\.\DISPLAY2";
-        service.Save("docker", new DockerWidgetSettings { Distribution = "Ubuntu-24.04", StatsIntervalSeconds = 7, MaxLogLines = 800 });
+        service.Save("docker", new DockerWidgetSettings { Distribution = "Ubuntu-24.04", CustomStatsIntervalSeconds = 7, MaxLogLines = 800 });
 
         var reloaded = new SettingsService(FilePath);
 
@@ -95,7 +95,7 @@ public sealed class SettingsServiceTests : IDisposable
     [Fact]
     public void OutOfRangeWidgetValues_AreClamped()
     {
-        var settings = new DockerWidgetSettings { ListIntervalSeconds = 0, StatsIntervalSeconds = double.NaN, MaxLogLines = 3 };
+        var settings = new DockerWidgetSettings { CustomListIntervalSeconds = 0, CustomStatsIntervalSeconds = double.NaN, MaxLogLines = 3 };
 
         Assert.Equal(TimeSpan.FromSeconds(1), settings.ListInterval);
         Assert.Equal(TimeSpan.FromSeconds(1), settings.StatsInterval);
@@ -103,95 +103,141 @@ public sealed class SettingsServiceTests : IDisposable
     }
 
     [Fact]
-    public void SettingsViewModel_SavesHotkeysWidgetStateAndUpdatePreferences()
+    public void AFileChangedByHand_IsTakenOverAndAnnounced()
     {
         var service = new SettingsService(FilePath);
-        var docker = new WidgetToggleViewModel("docker", "Docker", "Meerkat.Widgets.Docker", isEnabled: true);
+        service.Current.Opacity = 0.5;
+        service.Save();
+        var reloads = 0;
+        service.Reloaded += (_, _) => reloads++;
+
+        // What the service wrote itself is nothing new to it.
+        Assert.False(service.ReloadIfChanged());
+
+        File.WriteAllText(FilePath, File.ReadAllText(FilePath).Replace("0.5", "0.75"));
+        Assert.True(service.ReloadIfChanged());
+        Assert.Equal(0.75, service.Current.Opacity);
+        Assert.Equal(1, reloads);
+
+        // Halfway through an edit the file is no JSON; the settings in use stay until it is again.
+        File.WriteAllText(FilePath, "{ \"Opacity\": ");
+        Assert.False(service.ReloadIfChanged());
+        Assert.Equal(0.75, service.Current.Opacity);
+        Assert.Equal(1, reloads);
+    }
+
+    [Fact]
+    public void SettingsViewModel_StoresEveryChangeAtOnce()
+    {
+        var service = new SettingsService(FilePath);
+        var docker = new WidgetPageViewModel("docker", "Docker", isEnabled: true);
         var viewModel = CreateViewModel(service, docker);
+        var applied = 0;
+        var updateChanges = 0;
+        viewModel.Applied += (_, _) => applied++;
+        viewModel.UpdateSettingsApplied += (_, _) => updateChanges++;
 
         viewModel.TogglePanelHotkey = "Ctrl+Shift+F9";
+        Assert.Equal("Ctrl+Shift+F9", new SettingsService(FilePath).Current.TogglePanelHotkey);
+
         viewModel.CheckForUpdatesAutomatically = false;
         viewModel.SelectedChannel = viewModel.Channels.Single(option => option.Channel == UpdateChannel.Prerelease);
         docker.IsEnabled = false;
-        var saved = viewModel.TrySave();
 
-        Assert.True(saved);
         var reloaded = new SettingsService(FilePath);
-        Assert.Equal("Ctrl+Shift+F9", reloaded.Current.TogglePanelHotkey);
         Assert.Equal(["docker"], reloaded.Current.DisabledWidgets);
         Assert.False(reloaded.Current.Updates.CheckAutomatically);
         Assert.True(reloaded.Current.Updates.DownloadInBackground);
         Assert.Equal(UpdateChannel.Prerelease, reloaded.Current.Updates.Channel);
-        Assert.Equal(["Hotkeys", "General", "Widgets", "Updates"], viewModel.NavigationItems.Select(item => item.Title));
+        Assert.Equal(4, applied);
+        Assert.Equal(2, updateChanges);
+        Assert.Null(viewModel.ErrorMessage);
     }
 
     [Theory]
     [InlineData("M", "Ctrl+Alt+H")]
     [InlineData("Ctrl+Alt+H", "Ctrl+Alt+H")]
-    public void SettingsViewModel_RejectsInvalidOrConflictingHotkeys(string togglePanel, string toggleVisibility)
+    public void SettingsViewModel_DoesNotStoreInvalidOrConflictingHotkeys(string togglePanel, string toggleVisibility)
     {
         var service = new SettingsService(FilePath);
         var viewModel = CreateViewModel(service);
-        viewModel.TogglePanelHotkey = togglePanel;
-        viewModel.ToggleVisibilityHotkey = toggleVisibility;
+        var applied = 0;
+        viewModel.Applied += (_, _) => applied++;
 
-        Assert.False(viewModel.TrySave());
+        viewModel.ToggleVisibilityHotkey = toggleVisibility;
+        viewModel.TogglePanelHotkey = togglePanel;
+
         Assert.NotNull(viewModel.ErrorMessage);
-        Assert.False(File.Exists(FilePath));
+        Assert.Equal("Ctrl+Alt+M", service.Current.TogglePanelHotkey);
+        Assert.Equal(0, applied);
+
+        // Once the combination is fine, everything is stored and the complaint is gone.
+        viewModel.TogglePanelHotkey = "Ctrl+Alt+P";
+        Assert.Null(viewModel.ErrorMessage);
+        Assert.Equal("Ctrl+Alt+P", new SettingsService(FilePath).Current.TogglePanelHotkey);
     }
 
     [Fact]
-    public void SettingsViewModel_OffersNothingToConfigureForDisabledWidgets()
+    public void SettingsViewModel_HasOnePageForTheShellAndOnePerWidget()
     {
-        var docker = new WidgetToggleViewModel("docker", "Docker", "Meerkat.Widgets.Docker", isEnabled: true);
-        var notes = new WidgetToggleViewModel("notes", "Notes", "Meerkat.Widgets.Notes", isEnabled: false);
-        var page = new StubSettingsPage();
+        var docker = new WidgetPageViewModel("docker", "Docker", isEnabled: true);
+        var notes = new WidgetPageViewModel("notes", "Notes", isEnabled: false);
         var viewModel = new SettingsViewModel(
             new SettingsService(FilePath),
             [new MonitorOption(null, "Primary monitor")],
             [docker, notes],
-            [new WidgetSettingsSection("Docker", page, null!, "docker"), new WidgetSettingsSection("Notes", page, null!, "notes")],
             _updates.ViewModel,
-            hotkeyWarning: null,
-            FilePath)
-        {
-            WidgetHotkeys = [new WidgetHotkeyViewModel("notes/quick-note", "Quick note", "Notes", "Ctrl+Alt+N", "notes")],
-        };
+            widgetHotkeys: [new WidgetHotkeyViewModel("notes/quick-note", "Quick note", "Notes", "Ctrl+Alt+N", "notes")]);
 
-        Assert.Equal(["Hotkeys", "General", "Widgets", "Docker", "Updates"], viewModel.NavigationItems.Select(item => item.Title));
+        // A widget that is switched off keeps its entry: that is where it is switched on again.
+        Assert.Equal(["General", "Docker", "Notes"], viewModel.NavigationItems.Select(item => item.Title));
+        Assert.True(viewModel.IsGeneralSelected);
+        Assert.Null(viewModel.SelectedWidget);
         Assert.False(viewModel.WidgetHotkeys[0].IsAvailable);
 
-        // Switching widgets on and off shows and hides their pages right away, in the order of the widgets.
-        notes.IsEnabled = true;
-        Assert.Equal(["Hotkeys", "General", "Widgets", "Docker", "Notes", "Updates"], viewModel.NavigationItems.Select(item => item.Title));
+        viewModel.SelectWidget("notes");
+        Assert.Same(notes, viewModel.SelectedWidget);
+        Assert.Equal("Notes", viewModel.PageTitle);
+        Assert.False(viewModel.IsGeneralSelected);
+        Assert.Equal([false, false, true], viewModel.NavigationItems.Select(item => item.IsSelected));
+
+        // The switch sits on the page of the widget and works at once.
+        viewModel.SelectedWidget!.IsEnabled = true;
         Assert.True(viewModel.WidgetHotkeys[0].IsAvailable);
-
-        docker.IsEnabled = false;
-        Assert.Equal(["Hotkeys", "General", "Widgets", "Notes", "Updates"], viewModel.NavigationItems.Select(item => item.Title));
-
-        docker.IsEnabled = true;
-        Assert.Equal(["Hotkeys", "General", "Widgets", "Docker", "Notes", "Updates"], viewModel.NavigationItems.Select(item => item.Title));
-        Assert.Same(page, viewModel.NavigationItems[3].Section?.Page);
+        Assert.Empty(new SettingsService(FilePath).Current.DisabledWidgets);
     }
 
     [Fact]
     public void SettingsViewModel_SwitchesAutostartOnlyWhenTheUserChangedIt()
     {
         var autostart = new FakeAutostart { IsEnabled = true };
-        var unchanged = new SettingsViewModel(new SettingsService(FilePath), [new MonitorOption(null, "Primary monitor")], [], [], _updates.ViewModel, hotkeyWarning: null, FilePath) { Autostart = autostart };
-        Assert.True(unchanged.CanStartWithWindows);
-        Assert.True(unchanged.StartWithWindows);
+        var viewModel = new SettingsViewModel(new SettingsService(FilePath), [new MonitorOption(null, "Primary monitor")], [], _updates.ViewModel, autostart: autostart);
+        Assert.True(viewModel.CanStartWithWindows);
+        Assert.True(viewModel.StartWithWindows);
 
-        // The entry may point to another copy of Meerkat; saving other settings must leave it alone.
-        Assert.True(unchanged.TrySave());
+        // The entry may point to another copy of Meerkat; storing other settings must leave it alone.
+        viewModel.Opacity = 0.5;
         Assert.Equal(0, autostart.Changes);
 
-        unchanged.StartWithWindows = false;
-        Assert.True(unchanged.TrySave());
+        viewModel.StartWithWindows = false;
         Assert.False(autostart.IsEnabled);
         Assert.Equal(1, autostart.Changes);
 
         Assert.False(CreateViewModel(new SettingsService(FilePath)).CanStartWithWindows);
+    }
+
+    [Fact]
+    public void SettingsViewModel_OpensTheSettingsFileOnRequest()
+    {
+        var opened = 0;
+        var viewModel = new SettingsViewModel(new SettingsService(FilePath), [new MonitorOption(null, "Primary monitor")], [], _updates.ViewModel)
+        {
+            OpenSettingsFile = () => opened++,
+        };
+
+        viewModel.OpenFileCommand.Execute(null);
+
+        Assert.Equal(1, opened);
     }
 
     [Fact]
@@ -220,17 +266,8 @@ public sealed class SettingsServiceTests : IDisposable
         }
     }
 
-    private SettingsViewModel CreateViewModel(SettingsService service, params WidgetToggleViewModel[] widgets) =>
-        new(service, [new MonitorOption(null, "Primary monitor")], widgets, [], _updates.ViewModel, hotkeyWarning: null, FilePath);
-
-    private sealed class StubSettingsPage : Meerkat.Abstractions.IWidgetSettingsPage
-    {
-        public System.Windows.FrameworkElement CreateView() => throw new NotSupportedException();
-
-        public void Apply()
-        {
-        }
-    }
+    private SettingsViewModel CreateViewModel(SettingsService service, params WidgetPageViewModel[] widgets) =>
+        new(service, [new MonitorOption(null, "Primary monitor")], widgets, _updates.ViewModel);
 
     private sealed class FakeAutostart : IAutostart
     {

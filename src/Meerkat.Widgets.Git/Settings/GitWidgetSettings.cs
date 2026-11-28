@@ -34,28 +34,43 @@ public sealed class GitWidgetSettings
         $"git/{Provider}/{(Uri.TryCreate(ServerUrl, UriKind.Absolute, out var url) ? url.Host : ServerUrl)}".ToLowerInvariant();
 }
 
-public sealed class GitSettingsSource(IWidgetSettingsStore store, IWidgetSecretStore secrets)
+public sealed class GitSettingsSource
 {
+    private readonly IWidgetSecretStore _secrets;
+    private readonly IWidgetSettingsStore _store;
     private GitWidgetSettings? _current;
+
+    public GitSettingsSource(IWidgetSettingsStore store, IWidgetSecretStore secrets)
+    {
+        _store = store;
+        _secrets = secrets;
+
+        // Settings changed from outside, such as in the settings file, replace what was loaded.
+        store.Reloaded += (_, _) =>
+        {
+            _current = null;
+            Changed?.Invoke(this, EventArgs.Empty);
+        };
+    }
 
     public event EventHandler? Changed;
 
-    public GitWidgetSettings Current => _current ??= store.Load<GitWidgetSettings>(GitWidget.WidgetId);
+    public GitWidgetSettings Current => _current ??= _store.Load<GitWidgetSettings>(GitWidget.WidgetId);
 
-    public string? ReadToken(GitWidgetSettings settings) => secrets.Read(settings.SecretKey);
+    public string? ReadToken(GitWidgetSettings settings) => _secrets.Read(settings.SecretKey);
 
-    public void RemoveToken(GitWidgetSettings settings) => secrets.Delete(settings.SecretKey);
+    public void RemoveToken(GitWidgetSettings settings) => _secrets.Delete(settings.SecretKey);
 
     /// <param name="newToken">Replaces the stored token; null or empty keeps it.</param>
     public void Update(GitWidgetSettings settings, string? newToken)
     {
         if (!string.IsNullOrWhiteSpace(newToken))
         {
-            secrets.Write(settings.SecretKey, newToken.Trim());
+            _secrets.Write(settings.SecretKey, newToken.Trim());
         }
 
         _current = settings;
-        store.Save(GitWidget.WidgetId, settings);
+        _store.Save(GitWidget.WidgetId, settings);
         Changed?.Invoke(this, EventArgs.Empty);
     }
 }

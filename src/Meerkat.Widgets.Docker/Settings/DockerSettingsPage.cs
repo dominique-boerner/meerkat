@@ -1,5 +1,5 @@
 using System.Collections.ObjectModel;
-using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Globalization;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -8,100 +8,67 @@ using Meerkat.Abstractions;
 using Meerkat.Ssh;
 using Meerkat.Widgets.Docker.Containers;
 using Meerkat.Widgets.Docker.Security;
-using Meerkat.Widgets.Docker.ViewModels;
 using Meerkat.Widgets.Docker.Views;
 
 namespace Meerkat.Widgets.Docker.Settings;
 
-public sealed class DockerSettingsPage(
-    DockerSettingsSource settingsSource,
-    IWslDistributionCatalog distributionCatalog,
-    ISshClient ssh,
-    IWidgetSecretStore secrets,
-    IDockerShellFactory shells) : IWidgetSettingsPage
+public sealed class DockerSettingsPage : IWidgetSettingsPage
 {
+    private readonly DockerSettingsSource _settingsSource;
+    private readonly IWslDistributionCatalog _distributionCatalog;
+    private readonly MachineRegistry _machines;
+    private readonly IDockerShellFactory _shells;
+    private readonly ISshClient _ssh;
     private DockerSettingsPageViewModel? _viewModel;
+
+    public DockerSettingsPage(
+        DockerSettingsSource settingsSource,
+        IWslDistributionCatalog distributionCatalog,
+        MachineRegistry machines,
+        IDockerShellFactory shells,
+        ISshClient ssh)
+    {
+        _settingsSource = settingsSource;
+        _distributionCatalog = distributionCatalog;
+        _machines = machines;
+        _shells = shells;
+        _ssh = ssh;
+
+        // A machine entered while the settings are open is offered here right away.
+        machines.Changed += (_, _) => _viewModel?.SetMachines(machines.Machines);
+    }
 
     public FrameworkElement CreateView()
     {
-        _viewModel = new DockerSettingsPageViewModel(settingsSource.Current, ssh, host => secrets.Read(host.SecretKey) is { Length: > 0 }, shells);
-        _ = _viewModel.LoadDistributionsAsync(distributionCatalog);
-        return new DockerSettingsView { DataContext = _viewModel };
-    }
-
-    public void Apply()
-    {
-        if (_viewModel is null)
-        {
-            return;
-        }
-
-        // Passwords go to the secret store first, so that the hosts can sign in as soon as they are announced.
-        var settings = _viewModel.ToSettings();
-        foreach (var (hostId, password) in _viewModel.PendingPasswords)
-        {
-            secrets.Write($"docker/{hostId}", password);
-        }
-
-        var kept = settings.RemoteHosts.Where(host => host.Authentication == SshAuthentication.Password).Select(host => host.SecretKey).ToHashSet();
-        foreach (var previous in settingsSource.Current.RemoteHosts.Where(host => !kept.Contains(host.SecretKey)))
-        {
-            secrets.Delete(previous.SecretKey);
-        }
-
-        settingsSource.Update(settings);
+        var viewModel = new DockerSettingsPageViewModel(
+            _settingsSource.Current,
+            _machines.Machines,
+            _shells,
+            machine => new SshContainerProvider(_ssh, () => _machines.GetTarget(machine)).CheckAsync(CancellationToken.None));
+        viewModel.Changed += (_, _) => _settingsSource.Update(viewModel.ToSettings());
+        _viewModel = viewModel;
+        _ = viewModel.LoadDistributionsAsync(_distributionCatalog);
+        return new DockerSettingsView { DataContext = viewModel };
     }
 }
 
 public sealed record DistributionOption(string? Name, string DisplayName);
 
-public sealed record AuthenticationOption(SshAuthentication Authentication, string DisplayName);
-
-public sealed record HostIntervalOption(double Seconds, string DisplayName);
-
 public sealed record ThresholdOption(ReportThreshold Threshold, string DisplayName);
 
-/// <summary>
-/// A machine Docker runs on, as listed in the settings: this computer or another one. Tells whether the
-/// machine has a scanner for images and offers to install one.
-/// </summary>
-public sealed partial class DockerSystemViewModel(DockerHost? host, IImageScanner? scanner, Action<DockerSystemViewModel>? installed = null) : ObservableObject
+/// <summary>Tells whether a Docker system has a scanner for images and offers to install one.</summary>
+public sealed partial class ScannerStatusViewModel(IImageScanner? scanner, Action? installed = null) : ObservableObject
 {
-    public const string LocalName = "This computer";
-
     [ObservableProperty]
-    private string _scannerText = string.Empty;
+    private string _text = string.Empty;
 
     [ObservableProperty]
     private bool _canInstall;
 
     [ObservableProperty]
-    private bool _isBusy;
-
-    [ObservableProperty]
     private string? _error;
 
-    /// <summary>Null for this computer.</summary>
-    public DockerHost? Host => host;
-
-    public bool IsLocal => host is null;
-
-    public bool IsRemote => host is not null;
-
-    public string Name => host?.DisplayName ?? LocalName;
-
-    public string Address => host?.Address ?? string.Empty;
-
-    public string AccessText => host switch
-    {
-        null => string.Empty,
-        { AllowActions: true, ScanImages: true } => "start/stop allowed · scanned",
-        { AllowActions: true } => "start/stop allowed",
-        { ScanImages: true } => "read-only · scanned",
-        _ => "read-only",
-    };
-
-    /// <summary>Asks the machine whether it has a scanner. Does nothing where machines cannot be asked.</summary>
+    /// <summary>Asks the system whether it has a scanner. Does nothing where systems cannot be asked.</summary>
     public async Task DetectAsync()
     {
         if (scanner is null)
@@ -109,26 +76,28 @@ public sealed partial class DockerSystemViewModel(DockerHost? host, IImageScanne
             return;
         }
 
-        IsBusy = true;
         CanInstall = false;
         Error = null;
-        ScannerText = "checking …";
+        Text = "checking …";
         try
         {
             var info = await scanner.DetectAsync(CancellationToken.None);
-            ScannerText = info is null ? "no scanner" : $"{info.Name} {info.Version}";
+            Text = info is null ? "no scanner" : $"{info.Name} {info.Version}";
             CanInstall = info is null;
         }
         catch (Exception exception) when (exception is ScannerException or DockerShellException or ArgumentException)
         {
-            // Whether the machine can be reached is the business of the Docker page; here it only means "unknown".
-            ScannerText = "scanner unknown";
+            // Whether the system can be reached is the business of the Docker page; here it only means "unknown".
+            Text = "scanner unknown";
             Error = exception.Message;
         }
-        finally
-        {
-            IsBusy = false;
-        }
+    }
+
+    public void Clear()
+    {
+        Text = string.Empty;
+        CanInstall = false;
+        Error = null;
     }
 
     [RelayCommand]
@@ -139,92 +108,132 @@ public sealed partial class DockerSystemViewModel(DockerHost? host, IImageScanne
             return;
         }
 
-        IsBusy = true;
         CanInstall = false;
         Error = null;
-        ScannerText = "installing …";
+        Text = "installing …";
         try
         {
             var info = await scanner.InstallAsync(CancellationToken.None);
-            ScannerText = $"{info.Name} {info.Version} installed";
-            installed?.Invoke(this);
-            OnPropertyChanged(nameof(AccessText));
+            Text = $"{info.Name} {info.Version}";
+            installed?.Invoke();
         }
         catch (Exception exception) when (exception is ScannerException or DockerShellException or ArgumentException)
         {
-            ScannerText = "no scanner";
+            Text = "no scanner";
             CanInstall = true;
             Error = exception is ScannerException failure ? $"{failure.Message} {failure.Detail}" : exception.Message;
         }
-        finally
+    }
+}
+
+/// <summary>One of the shared machines that the Docker widget shows, and what it may do there.</summary>
+public sealed partial class DockerMachineOptionViewModel : ObservableObject
+{
+    private readonly DockerMachineUse _use;
+    private readonly Func<SshMachine, Task<string>>? _checkDocker;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AccessText))]
+    private bool _allowActions;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AccessText))]
+    private bool _scanImages;
+
+    /// <summary>True while the options of the machine are shown for editing.</summary>
+    [ObservableProperty]
+    private bool _isOpen;
+
+    /// <summary>What the last check of the connection found.</summary>
+    [ObservableProperty]
+    private string _checkResult = string.Empty;
+
+    [ObservableProperty]
+    private bool _isCheckFailed;
+
+    /// <param name="checkDocker">Asks the Docker daemon of a machine for its version; without it no check is offered.</param>
+    public DockerMachineOptionViewModel(SshMachine machine, DockerMachineUse use, IDockerShellFactory? shells, Func<SshMachine, Task<string>>? checkDocker = null)
+    {
+        Machine = machine;
+        _use = use;
+        _checkDocker = checkDocker;
+        _allowActions = use.AllowActions;
+        _scanImages = use.ScanImages;
+
+        // A scanner the user just installed is meant to be used, so scanning is switched on with it.
+        Scanner = new ScannerStatusViewModel(
+            shells is null ? null : new TrivyScanner(shells.ForHost(DockerHost.From(machine, use, DockerHost.DefaultIntervalSeconds))),
+            () => ScanImages = true);
+        _ = Scanner.DetectAsync();
+    }
+
+    public SshMachine Machine { get; }
+
+    public string Name => Machine.DisplayName;
+
+    public string Destination => Machine.Destination;
+
+    /// <summary>What the widget may do on the machine, in a word or two.</summary>
+    public string AccessText => $"{(AllowActions ? "start/stop allowed" : "read-only")}{(ScanImages ? " · scanned" : string.Empty)}";
+
+    public bool CanCheck => _checkDocker is not null;
+
+    public ScannerStatusViewModel Scanner { get; }
+
+    public DockerMachineUse ToUse() => new()
+    {
+        MachineId = Machine.Id,
+        ShowContainers = true,
+        AllowActions = AllowActions,
+        ScanImages = ScanImages,
+        IntervalSeconds = _use.IntervalSeconds,
+    };
+
+    [RelayCommand]
+    private void ToggleOpen() => IsOpen = !IsOpen;
+
+    /// <summary>Connects once and asks for Docker, so that a machine without it shows here and not on the Docker page.</summary>
+    [RelayCommand]
+    private async Task CheckAsync()
+    {
+        if (_checkDocker is null)
         {
-            IsBusy = false;
+            return;
+        }
+
+        IsCheckFailed = false;
+        CheckResult = "Connecting …";
+        try
+        {
+            CheckResult = $"Connected. Docker {await _checkDocker(Machine)}.";
+        }
+        catch (Exception exception) when (exception is ContainerProviderException or ArgumentException or InvalidOperationException)
+        {
+            var failure = ViewModels.ContainerFailureViewModel.From(exception, Name);
+            IsCheckFailed = true;
+            CheckResult = $"{failure.Title}. {failure.Message}";
         }
     }
 }
 
 public sealed partial class DockerSettingsPageViewModel : ObservableObject
 {
-    private readonly ISshClient? _ssh;
     private readonly IDockerShellFactory? _shells;
-    private readonly Func<DockerHost, bool> _isPasswordStored;
-    private DockerHost? _editing;
+    private readonly Func<SshMachine, Task<string>>? _checkDocker;
+    private IReadOnlyList<SshMachine> _allMachines = [];
 
     // Not edited here, but part of the settings this page writes back as a whole.
-    private readonly IReadOnlyList<string> _collapsedSources;
+    private readonly DockerWidgetSettings _original;
+
+    // While the page fills itself in, nothing the user did has changed.
+    private readonly bool _isLoading = true;
 
     [ObservableProperty]
     private DistributionOption _selectedDistribution;
 
     [ObservableProperty]
-    private double _listIntervalSeconds;
-
-    [ObservableProperty]
-    private double _statsIntervalSeconds;
-
-    [ObservableProperty]
-    private int _maxLogLines;
-
-    [ObservableProperty]
-    private bool _isFormOpen;
-
-    [ObservableProperty]
-    private string _formTitle = string.Empty;
-
-    [ObservableProperty]
-    private string _hostName = string.Empty;
-
-    [ObservableProperty]
-    private string _hostAddress = string.Empty;
-
-    [ObservableProperty]
-    private string _hostUser = string.Empty;
-
-    [ObservableProperty]
-    private string _hostPort = string.Empty;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(UsesKeyFile), nameof(UsesPassword))]
-    private AuthenticationOption _selectedAuthentication;
-
-    [ObservableProperty]
-    private string _keyFile = string.Empty;
-
-    /// <summary>A password typed into the form; empty keeps the stored one.</summary>
-    [ObservableProperty]
-    private string _password = string.Empty;
-
-    [ObservableProperty]
-    private bool _hasStoredPassword;
-
-    [ObservableProperty]
-    private HostIntervalOption _selectedHostInterval;
-
-    [ObservableProperty]
-    private bool _allowActions;
-
-    [ObservableProperty]
-    private bool _scanHostImages;
+    [NotifyPropertyChangedFor(nameof(IsFast), nameof(IsNormal), nameof(IsEconomical))]
+    private RefreshRate _refresh;
 
     [ObservableProperty]
     private bool _scanLocalImages;
@@ -236,6 +245,10 @@ public sealed partial class DockerSettingsPageViewModel : ObservableObject
     [ObservableProperty]
     private string _dailyScanTime;
 
+    /// <summary>Set while the time typed is none; it is stored once it is.</summary>
+    [ObservableProperty]
+    private string? _dailyScanTimeError;
+
     [ObservableProperty]
     private bool _onlyFixable;
 
@@ -245,40 +258,27 @@ public sealed partial class DockerSettingsPageViewModel : ObservableObject
     [ObservableProperty]
     private bool _isIgnoredListOpen;
 
+    /// <summary>True while the machines that can be added are offered for choosing.</summary>
     [ObservableProperty]
-    private string? _formError;
+    private bool _isPickerOpen;
 
-    [ObservableProperty]
-    private string? _formErrorDetail;
-
-    [ObservableProperty]
-    private bool _isChecking;
-
-    /// <param name="ssh">Used to check a host before it is added; without it hosts cannot be added.</param>
+    /// <param name="machines">The machines all widgets share; the page chooses which of them this widget shows.</param>
     /// <param name="shells">Used to look for a scanner on the systems and to install one; without it neither is offered.</param>
+    /// <param name="checkDocker">Asks the Docker daemon of a machine for its version; without it no check is offered.</param>
     public DockerSettingsPageViewModel(
         DockerWidgetSettings settings,
-        ISshClient? ssh = null,
-        Func<DockerHost, bool>? hasStoredPassword = null,
-        IDockerShellFactory? shells = null)
+        IReadOnlyList<SshMachine>? machines = null,
+        IDockerShellFactory? shells = null,
+        Func<SshMachine, Task<string>>? checkDocker = null)
     {
-        _ssh = ssh;
+        _original = settings;
         _shells = shells;
-        _isPasswordStored = hasStoredPassword ?? (_ => false);
-        _collapsedSources = [.. settings.CollapsedSources];
+        _checkDocker = checkDocker;
 
         var defaultOption = new DistributionOption(null, "Default distribution");
         Distributions.Add(defaultOption);
         _selectedDistribution = settings.Distribution is { Length: > 0 } configured ? AddOption(configured) : defaultOption;
-        _listIntervalSeconds = settings.ListIntervalSeconds;
-        _statsIntervalSeconds = settings.StatsIntervalSeconds;
-        _maxLogLines = settings.MaxLogLines;
-        _selectedAuthentication = AuthenticationOptions[0];
-        _selectedHostInterval = HostIntervals[1];
-        foreach (var host in settings.RemoteHosts)
-        {
-            RemoteHosts.Add(host.Clone());
-        }
+        _refresh = settings.Refresh;
 
         var security = settings.Security;
         _scanLocalImages = security.ScanLocalImages;
@@ -291,19 +291,35 @@ public sealed partial class DockerSettingsPageViewModel : ObservableObject
             Ignored.Add(ignored);
         }
 
-        Ignored.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IgnoredLinkText));
-        RemoteHosts.CollectionChanged += OnRemoteHostsChanged;
-        Systems.Add(CreateSystem(null));
-        foreach (var host in RemoteHosts)
+        Ignored.CollectionChanged += (_, _) =>
         {
-            Systems.Add(CreateSystem(host));
-        }
+            OnPropertyChanged(nameof(IgnoredLinkText));
+            OnPropertyChanged(nameof(HasIgnored));
+            RaiseChanged();
+        };
+
+        LocalScanner = new ScannerStatusViewModel(
+            shells is null ? null : new TrivyScanner(shells.ForLocal(() => SelectedDistribution.Name)),
+            () => ScanLocalImages = true);
+        _ = LocalScanner.DetectAsync();
+        SetMachines(machines ?? []);
+        _isLoading = false;
     }
 
-    /// <summary>This computer first, then the other machines: everything Docker is watched on.</summary>
-    public ObservableCollection<DockerSystemViewModel> Systems { get; } = [];
+    /// <summary>Raised when something that is stored was changed and is valid.</summary>
+    public event EventHandler? Changed;
+
+    public ObservableCollection<DistributionOption> Distributions { get; } = [];
+
+    /// <summary>The machines the widget shows.</summary>
+    public ObservableCollection<DockerMachineOptionViewModel> Machines { get; } = [];
+
+    /// <summary>The machines of the shared list the widget does not show yet; offered by "+ Machine".</summary>
+    public ObservableCollection<SshMachine> AvailableMachines { get; } = [];
 
     public ObservableCollection<IgnoredVulnerability> Ignored { get; } = [];
+
+    public ScannerStatusViewModel LocalScanner { get; }
 
     public IReadOnlyList<ThresholdOption> Thresholds { get; } =
     [
@@ -312,40 +328,45 @@ public sealed partial class DockerSettingsPageViewModel : ObservableObject
         new(ReportThreshold.Never, "Never"),
     ];
 
-    public string IgnoredLinkText => $"Manage ignored vulnerabilities ({Ignored.Count})";
+    // One property per choice. Each only reacts to being selected; deselecting follows from the others.
+    public bool IsFast
+    {
+        get => Refresh == RefreshRate.Fast;
+        set => Select(value, RefreshRate.Fast);
+    }
 
-    public string InstallDescription => TrivyScanner.InstallDescription;
+    public bool IsNormal
+    {
+        get => Refresh == RefreshRate.Normal;
+        set => Select(value, RefreshRate.Normal);
+    }
 
-    public bool CanInstallScanners => _shells is not null;
+    public bool IsEconomical
+    {
+        get => Refresh == RefreshRate.Economical;
+        set => Select(value, RefreshRate.Economical);
+    }
 
-    public ObservableCollection<DistributionOption> Distributions { get; } = [];
+    public bool HasMachines => Machines.Count > 0;
 
-    public ObservableCollection<DockerHost> RemoteHosts { get; } = [];
+    public bool CanAddMachine => AvailableMachines.Count > 0;
 
-    /// <summary>Passwords entered in this session, by host id; written to the secret store when the settings are saved.</summary>
-    public Dictionary<string, string> PendingPasswords { get; } = [];
+    /// <summary>Says why there is nothing to add, where that is the case.</summary>
+    public string? AddMachineHint => CanAddMachine ? null
+        : _allMachines.Count == 0 ? "Enter a machine on the Machines page first."
+        : "Every machine is listed already. Enter more on the Machines page.";
 
-    public IReadOnlyList<AuthenticationOption> AuthenticationOptions { get; } =
-    [
-        new(SshAuthentication.Agent, "SSH agent or ~/.ssh/config"),
-        new(SshAuthentication.KeyFile, "Key file"),
-        new(SshAuthentication.Password, "Password"),
-    ];
+    public bool HasIgnored => Ignored.Count > 0;
 
-    public IReadOnlyList<HostIntervalOption> HostIntervals { get; } =
-    [
-        new(10, "every 10 s"),
-        new(20, "every 20 s"),
-        new(30, "every 30 s"),
-        new(60, "every minute"),
-        new(300, "every 5 min"),
-    ];
+    public string IgnoredLinkText => $"Ignored vulnerabilities ({Ignored.Count})";
 
-    public bool CanAddHosts => _ssh is not null;
+    public string RefreshInfo =>
+        "How often Docker is asked: containers every 2, 5 or 15 seconds, figures every 2, 3 or 10. Other machines are asked less often, every 10, 20 or 60 seconds, because every request opens an SSH connection. Other figures can be set in settings.json.";
 
-    public bool UsesKeyFile => SelectedAuthentication.Authentication == SshAuthentication.KeyFile;
+    public string MachinesInfo =>
+        "Machines are entered once, on the Machines page; \"+ Machine\" adds one of them here. Meerkat runs the docker CLI there over SSH, so the user it signs in with must be allowed to use Docker, which usually means being in the docker group. Without the permission to start and stop, a machine is only read. A scan runs on the machine itself and takes some of its processor time once a day.";
 
-    public bool UsesPassword => SelectedAuthentication.Authentication == SshAuthentication.Password;
+    public string ScannerInfo => $"Images are scanned with Trivy on the system they are on. {TrivyScanner.InstallDescription}";
 
     public async Task LoadDistributionsAsync(IWslDistributionCatalog catalog)
     {
@@ -362,228 +383,157 @@ public sealed partial class DockerSettingsPageViewModel : ObservableObject
         }
     }
 
+    /// <summary>Takes over the shared machines as they are now, keeping what was chosen for those that stay.</summary>
+    public void SetMachines(IReadOnlyList<SshMachine> machines)
+    {
+        var chosen = _isLoading ? _original.Machines.Where(use => use.ShowContainers).ToList() : [.. Machines.Select(option => option.ToUse())];
+        var open = Machines.Where(option => option.IsOpen).Select(option => option.Machine.Id).ToHashSet();
+        _allMachines = machines;
+
+        foreach (var option in Machines)
+        {
+            option.PropertyChanged -= OnMachineChanged;
+        }
+
+        Machines.Clear();
+        foreach (var use in chosen)
+        {
+            // A machine that was removed from the shared list is gone here as well.
+            if (machines.FirstOrDefault(machine => machine.Id == use.MachineId) is { } machine)
+            {
+                Add(machine, use).IsOpen = open.Contains(machine.Id);
+            }
+        }
+
+        RefreshAvailable();
+    }
+
     public DockerWidgetSettings ToSettings() => new()
     {
         Distribution = SelectedDistribution.Name,
-        ListIntervalSeconds = ListIntervalSeconds,
-        StatsIntervalSeconds = StatsIntervalSeconds,
-        MaxLogLines = MaxLogLines,
-        RemoteHosts = [.. RemoteHosts.Select(host => host.Clone())],
-        CollapsedSources = [.. _collapsedSources],
+        Refresh = Refresh,
+        CustomListIntervalSeconds = _original.CustomListIntervalSeconds,
+        CustomStatsIntervalSeconds = _original.CustomStatsIntervalSeconds,
+        CustomRemoteIntervalSeconds = _original.CustomRemoteIntervalSeconds,
+        MaxLogLines = _original.MaxLogLines,
+        Machines = [.. Machines.Select(option => option.ToUse())],
+        CollapsedSources = [.. _original.CollapsedSources],
         Security = new DockerSecuritySettings
         {
             ScanLocalImages = ScanLocalImages,
             ReportFrom = SelectedThreshold.Threshold,
+
+            // A time that is none is not stored; the one stored last stays until the field holds a time again.
             DailyScanTime = DockerSecuritySettings.TryParseTime(DailyScanTime, out var time)
                 ? time.ToString("HH:mm", CultureInfo.InvariantCulture)
-                : throw new InvalidOperationException("Enter the time of the daily scan as hours and minutes, for example 12:30."),
+                : _original.Security.DailyScanTime,
             OnlyFixable = OnlyFixable,
             SkipOnBattery = SkipOnBattery,
             Ignored = [.. Ignored],
         },
     };
 
+    protected override void OnPropertyChanged(PropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (e.PropertyName is nameof(SelectedDistribution) or nameof(Refresh) or nameof(ScanLocalImages) or nameof(SelectedThreshold)
+            or nameof(OnlyFixable) or nameof(SkipOnBattery))
+        {
+            RaiseChanged();
+        }
+    }
+
     [RelayCommand]
     private void ToggleIgnoredList() => IsIgnoredListOpen = !IsIgnoredListOpen;
+
+    /// <summary>Lets the widget show one of the shared machines, read-only until the user decides otherwise.</summary>
+    [RelayCommand]
+    private void AddMachine(SshMachine machine)
+    {
+        IsPickerOpen = false;
+        if (Machines.Any(option => option.Machine.Id == machine.Id))
+        {
+            return;
+        }
+
+        // Opened right away: whoever adds a machine will want to say what may be done there.
+        Add(machine, new DockerMachineUse { MachineId = machine.Id }).IsOpen = true;
+        RefreshAvailable();
+        RaiseChanged();
+    }
+
+    /// <summary>Takes the machine off this widget; it stays on the shared list.</summary>
+    [RelayCommand]
+    private void RemoveMachine(DockerMachineOptionViewModel option)
+    {
+        option.PropertyChanged -= OnMachineChanged;
+        Machines.Remove(option);
+        RefreshAvailable();
+        RaiseChanged();
+    }
 
     [RelayCommand]
     private void RestoreIgnored(IgnoredVulnerability ignored) => Ignored.Remove(ignored);
 
-    [RelayCommand]
-    private void AddHost()
-    {
-        _editing = null;
-        LoadForm(new DockerHost(), "Add host");
-    }
-
-    [RelayCommand]
-    private void EditHost(DockerHost host)
-    {
-        _editing = host;
-        LoadForm(host, $"Edit {host.DisplayName}");
-    }
-
-    [RelayCommand]
-    private void RemoveHost(DockerHost host)
-    {
-        RemoteHosts.Remove(host);
-        PendingPasswords.Remove(host.Id);
-        if (_editing == host)
-        {
-            IsFormOpen = false;
-        }
-    }
-
-    [RelayCommand]
-    private void CancelForm() => IsFormOpen = false;
-
-    /// <summary>
-    /// Connects to the host once and asks its Docker daemon for its version. Only a host that answers is put
-    /// on the list: this first connection is also what makes SSH remember the host's key.
-    /// </summary>
-    [RelayCommand]
-    private async Task ConnectAndCheckAsync()
-    {
-        if (_ssh is null || TryBuildHost() is not { } host)
-        {
-            return;
-        }
-
-        var password = Password.Length > 0 ? Password : null;
-        if (host.Authentication == SshAuthentication.Password && password is null && !HasStoredPassword)
-        {
-            SetError("Enter the password.");
-            return;
-        }
-
-        IsChecking = true;
-        try
-        {
-            // A stored password is not known to this form, so such a host is taken over without a new check.
-            if (host.Authentication != SshAuthentication.Password || password is not null)
-            {
-                await new SshContainerProvider(_ssh, () => host.ToTarget(password)).CheckAsync(CancellationToken.None);
-            }
-
-            if (password is not null)
-            {
-                PendingPasswords[host.Id] = password;
-            }
-
-            if (_editing is not null && RemoteHosts.IndexOf(_editing) is >= 0 and var index)
-            {
-                RemoteHosts[index] = host;
-            }
-            else
-            {
-                RemoteHosts.Add(host);
-            }
-
-            IsFormOpen = false;
-        }
-        catch (Exception exception) when (exception is ContainerProviderException or ArgumentException or InvalidOperationException)
-        {
-            var failure = ContainerFailureViewModel.From(exception, host.DisplayName);
-            SetError($"{failure.Title}. {failure.Message}", failure.Detail);
-        }
-        finally
-        {
-            IsChecking = false;
-        }
-    }
-
-    private void LoadForm(DockerHost host, string title)
-    {
-        FormTitle = title;
-        HostName = host.Name;
-        HostAddress = host.Address;
-        HostUser = host.User ?? string.Empty;
-        HostPort = host.Port?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
-        SelectedAuthentication = AuthenticationOptions.First(option => option.Authentication == host.Authentication);
-        KeyFile = host.KeyFile ?? string.Empty;
-        Password = string.Empty;
-        HasStoredPassword = PendingPasswords.ContainsKey(host.Id) || _isPasswordStored(host);
-        SelectedHostInterval = HostIntervals.FirstOrDefault(option => option.Seconds >= host.IntervalSeconds) ?? HostIntervals[^1];
-        AllowActions = host.AllowActions;
-        ScanHostImages = host.ScanImages;
-        SetError(null);
-        IsFormOpen = true;
-    }
-
-    private DockerHost? TryBuildHost()
-    {
-        int? port = null;
-        if (HostPort.Trim().Length > 0)
-        {
-            if (!int.TryParse(HostPort.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var parsed))
-            {
-                SetError("The port must be a number.");
-                return null;
-            }
-
-            port = parsed;
-        }
-
-        var host = new DockerHost
-        {
-            Id = _editing?.Id ?? Guid.NewGuid().ToString("N"),
-            Name = HostName.Trim(),
-            Address = HostAddress.Trim(),
-            User = HostUser.Trim().Length > 0 ? HostUser.Trim() : null,
-            Port = port,
-            Authentication = SelectedAuthentication.Authentication,
-            KeyFile = UsesKeyFile && KeyFile.Trim().Length > 0 ? KeyFile.Trim() : null,
-            IntervalSeconds = SelectedHostInterval.Seconds,
-            AllowActions = AllowActions,
-            ScanImages = ScanHostImages,
-        };
-
-        try
-        {
-            host.ToTarget(password: null).Validate();
-        }
-        catch (ArgumentException exception)
-        {
-            SetError(exception.Message);
-            return null;
-        }
-
-        SetError(null);
-        return host;
-    }
-
-    private DockerSystemViewModel CreateSystem(DockerHost? host)
-    {
-        IImageScanner? scanner = _shells is null ? null
-            : host is null ? new TrivyScanner(_shells.ForLocal(() => SelectedDistribution.Name))
-            : new TrivyScanner(_shells.ForHost(host, PendingPasswords.GetValueOrDefault(host.Id)));
-
-        // A scanner the user just installed is meant to be used, so scanning is switched on with it.
-        var system = new DockerSystemViewModel(host, scanner, installed =>
-        {
-            if (installed.Host is { } remote)
-            {
-                remote.ScanImages = true;
-            }
-            else
-            {
-                ScanLocalImages = true;
-            }
-        });
-        _ = system.DetectAsync();
-        return system;
-    }
-
-    private void OnRemoteHostsChanged(object? sender, NotifyCollectionChangedEventArgs e)
-    {
-        // Hosts that stay keep their entry, and with it what is known about their scanner.
-        foreach (var gone in Systems.Where(system => system.Host is { } host && !RemoteHosts.Contains(host)).ToList())
-        {
-            Systems.Remove(gone);
-        }
-
-        for (var index = 0; index < RemoteHosts.Count; index++)
-        {
-            if (Systems.All(system => system.Host != RemoteHosts[index]))
-            {
-                Systems.Insert(Math.Min(index + 1, Systems.Count), CreateSystem(RemoteHosts[index]));
-            }
-        }
-    }
-
     partial void OnSelectedDistributionChanged(DistributionOption value)
     {
-        // Another distribution is another machine as far as its programs go.
-        if (Systems.Count > 0)
+        // Another distribution is another system as far as its programs go.
+        _ = LocalScanner.DetectAsync();
+    }
+
+    partial void OnDailyScanTimeChanged(string value)
+    {
+        var isValid = DockerSecuritySettings.TryParseTime(value, out _);
+        DailyScanTimeError = isValid ? null : "Enter hours and minutes, for example 12:30.";
+        if (isValid)
         {
-            _ = Systems[0].DetectAsync();
+            RaiseChanged();
         }
     }
 
-    private void SetError(string? message, string? detail = null)
+    private void OnMachineChanged(object? sender, PropertyChangedEventArgs e)
     {
-        FormError = message;
-        FormErrorDetail = detail;
+        if (e.PropertyName is nameof(DockerMachineOptionViewModel.AllowActions) or nameof(DockerMachineOptionViewModel.ScanImages))
+        {
+            RaiseChanged();
+        }
+    }
+
+    private DockerMachineOptionViewModel Add(SshMachine machine, DockerMachineUse use)
+    {
+        var option = new DockerMachineOptionViewModel(machine, use, _shells, _checkDocker);
+        option.PropertyChanged += OnMachineChanged;
+        Machines.Add(option);
+        return option;
+    }
+
+    private void RefreshAvailable()
+    {
+        AvailableMachines.Clear();
+        foreach (var machine in _allMachines.Where(machine => Machines.All(option => option.Machine.Id != machine.Id)))
+        {
+            AvailableMachines.Add(machine);
+        }
+
+        OnPropertyChanged(nameof(HasMachines));
+        OnPropertyChanged(nameof(CanAddMachine));
+        OnPropertyChanged(nameof(AddMachineHint));
+    }
+
+    private void RaiseChanged()
+    {
+        if (!_isLoading)
+        {
+            Changed?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void Select(bool isSelected, RefreshRate rate)
+    {
+        if (isSelected)
+        {
+            Refresh = rate;
+        }
     }
 
     private DistributionOption AddOption(string name)

@@ -7,20 +7,11 @@ namespace Meerkat.Widgets.Notes.Settings;
 
 public sealed class NotesSettingsPage(NotesSettingsSource settingsSource) : IWidgetSettingsPage
 {
-    private NotesSettingsPageViewModel? _viewModel;
-
     public FrameworkElement CreateView()
     {
-        _viewModel = new NotesSettingsPageViewModel(settingsSource.Current);
-        return new NotesSettingsView { DataContext = _viewModel };
-    }
-
-    public void Apply()
-    {
-        if (_viewModel is not null)
-        {
-            settingsSource.Update(_viewModel.ToSettings());
-        }
+        var viewModel = new NotesSettingsPageViewModel(settingsSource.Current);
+        viewModel.PropertyChanged += (_, _) => settingsSource.Update(viewModel.ToSettings());
+        return new NotesSettingsView { DataContext = viewModel };
     }
 }
 

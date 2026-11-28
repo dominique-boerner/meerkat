@@ -1,3 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- SSH access through the OpenSSH client of Windows, shared by the widgets that reach other machines. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Meerkat.Abstractions\Meerkat.Abstractions.csproj" />
+  </ItemGroup>
 </Project>
