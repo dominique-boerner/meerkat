@@ -9,6 +9,8 @@ The section of a version becomes the text of its GitHub release and is what Meer
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-11-28
+
 ### Added
 
 - Plugins: Meerkat loads widgets that are not part of it from folders below
