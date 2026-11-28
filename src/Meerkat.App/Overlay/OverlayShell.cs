@@ -216,7 +216,7 @@ public sealed class OverlayShell(
 
         try
         {
-            return new WidgetReport(hosted.Widget.Status, hosted.Widget.Alerts, hosted.Widget.StatusCard, hosted.Entry.Id);
+            return new WidgetReport(hosted.Widget.Status, hosted.Widget.Alerts, hosted.Widget.StatusCard, hosted.Entry.Id, hosted.Widget.AdditionalStatuses);
         }
         catch (Exception exception)
         {

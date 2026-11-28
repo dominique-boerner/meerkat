@@ -114,10 +114,11 @@ public sealed class DiskWidget(IOverlayState overlayState) : IOverlayWidget
 | `View` | The widget's page in the panel. Created lazily on the UI thread; return the same instance on every call. |
 | `HeaderView` | Optional content above the page, for example a summary and buttons. |
 | `Status` | The widget's chip in the status bar: a label, a compact figure and a severity. Return null while there is nothing to report. |
+| `AdditionalStatuses` | Further chips, shown right after `Status`. For the rare widget that watches two things worth telling apart at a glance, as the Docker widget does with containers and images. |
 | `Alerts` | Conditions that need attention right now. |
 | `StatusCard` | Optional card below the status bar for something the user chose to keep in view, see [Status cards and hotkeys](#status-cards-and-hotkeys). |
 | `Hotkeys` | Optional global hotkeys, see [Status cards and hotkeys](#status-cards-and-hotkeys). |
-| `StatusChanged` | Raise it whenever `Status`, `Alerts` or `StatusCard` changed. It may be raised from any thread. |
+| `StatusChanged` | Raise it whenever `Status`, `AdditionalStatuses`, `Alerts` or `StatusCard` changed. It may be raised from any thread. |
 | `SettingsPage` | Optional settings editor, see [Settings](#settings). |
 | `StartAsync` / `StopAsync` | Called when the widget is enabled, disabled or restarted, and on shutdown. Both run on the UI thread. |
 

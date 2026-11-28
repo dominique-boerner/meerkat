@@ -22,6 +22,12 @@ public interface IOverlayWidget
     /// <summary>The widget's entry in the status bar, or null if it has nothing to report yet.</summary>
     WidgetStatus? Status => null;
 
+    /// <summary>
+    /// Further entries in the status bar, for the rare widget that watches two things worth telling apart
+    /// at a glance. Most widgets say all they have to say with <see cref="Status"/>.
+    /// </summary>
+    IReadOnlyList<WidgetStatus> AdditionalStatuses => [];
+
     /// <summary>Conditions that need attention right now. Errors appear in the status bar, warnings in the panel.</summary>
     IReadOnlyList<WidgetAlert> Alerts => [];
 
@@ -31,7 +37,7 @@ public interface IOverlayWidget
     /// <summary>Global hotkeys of the widget. Read once when the widget is registered.</summary>
     IReadOnlyList<WidgetHotkey> Hotkeys => [];
 
-    /// <summary>Raise whenever <see cref="Status"/>, <see cref="Alerts"/> or <see cref="StatusCard"/> changed.</summary>
+    /// <summary>Raise whenever <see cref="Status"/>, <see cref="AdditionalStatuses"/>, <see cref="Alerts"/> or <see cref="StatusCard"/> changed.</summary>
     event EventHandler? StatusChanged
     {
         add { }

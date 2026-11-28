@@ -13,10 +13,16 @@ public sealed record AlertCardViewModel(string Title, string Detail, string AgeT
 public sealed record StatusCardViewModel(WidgetStatusCard Card, string? WidgetId = null);
 
 /// <summary>What one widget currently reports to the shell.</summary>
-public sealed record WidgetReport(WidgetStatus? Status, IReadOnlyList<WidgetAlert> Alerts, WidgetStatusCard? Card = null, string? WidgetId = null);
+/// <param name="AdditionalStatuses">Further entries of the widget in the status bar, shown right after <paramref name="Status"/>.</param>
+public sealed record WidgetReport(
+    WidgetStatus? Status,
+    IReadOnlyList<WidgetAlert> Alerts,
+    WidgetStatusCard? Card = null,
+    string? WidgetId = null,
+    IReadOnlyList<WidgetStatus>? AdditionalStatuses = null);
 
 /// <summary>
-/// Backs the always-visible status bar: one chip per widget, plus a card for every error. Warnings are
+/// Backs the always-visible status bar: a chip per widget entry, plus a card for every error. Warnings are
 /// only counted, because the bar must stay small enough to ignore while everything works.
 /// </summary>
 public sealed partial class StatusBarViewModel : ObservableObject
@@ -56,7 +62,7 @@ public sealed partial class StatusBarViewModel : ObservableObject
     public void Update(IReadOnlyList<WidgetReport> reports, DateTimeOffset now, string panelHotkeyText, string? notice)
     {
         Replace(Chips, reports
-            .Select(report => report.Status)
+            .SelectMany(report => new[] { report.Status }.Concat(report.AdditionalStatuses ?? []))
             .OfType<WidgetStatus>()
             .Select(status => new StatusChipViewModel(status.Label, status.Summary, status.Severity)));
 
