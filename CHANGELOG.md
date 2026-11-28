@@ -21,6 +21,12 @@ The section of a version becomes the text of its GitHub release and is what Meer
 
 ### Changed
 
+- The *Security* tab of the Docker page groups the images the way the *Containers* tab groups the
+  containers: one section per system, with a heading that folds it up and tells how its images are
+  doing. Systems whose images are not scanned are listed too and say so.
+- The *Security* tab no longer repeats the reported vulnerabilities in banners above the images, nor
+  the advice to pull a newer image under each of them. What is reported shows in the status bar and
+  in the counts; the list of the selected image has the details.
 - A card shows a symbol for what it is about, such as a shield for vulnerabilities, in the colour of
   its severity, instead of a cross that looked like a button to close it.
 

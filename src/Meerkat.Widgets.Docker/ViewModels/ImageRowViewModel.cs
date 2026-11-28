@@ -117,7 +117,7 @@ public sealed partial class ImageRowViewModel(ImageDetails details) : Observable
             : _scan is null ? NoValue
             : AgeFormatter.Format(now - _scan.ScannedAt);
 
-    /// <summary>Says where a fix has to come from: from a rebuild of an own image, or from whoever publishes the image.</summary>
+    /// <summary>Says whether the image is an own build and what it is built on, as far as that is known.</summary>
     private string? DescribeOrigin()
     {
         if (Details.IsOwnBuild)
@@ -125,14 +125,9 @@ public sealed partial class ImageRowViewModel(ImageDetails details) : Observable
             return Details.BaseImage is { } baseImage ? $"own image · base {baseImage}" : "own image";
         }
 
-        if (Details.BaseImage is { } builtOn)
-        {
-            return $"base {builtOn}";
-        }
-
-        return Shown.Any(vulnerability => vulnerability.HasFix && vulnerability.Severity >= VulnerabilitySeverity.High)
-            ? "a newer image may carry the fixes · pull"
-            : null;
+        // An image from a registry gets no line of its own: the advice would be the same under every one
+        // of them, and it is given where it matters, with the finding that is reported.
+        return Details.BaseImage is { } builtOn ? $"base {builtOn}" : null;
     }
 
     partial void OnIsScanningChanged(bool value)

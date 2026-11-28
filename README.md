@@ -214,11 +214,10 @@ WSL distribution or another machine, so no image is copied anywhere.
   appears. This computer is not scanned while it runs on battery unless you ask for a scan.
 - Another machine is only scanned if you switch that on under *Edit*. A scan takes some of its
   processor time, which is why it is off by default.
-- Vulnerabilities from the severity you choose, critical by default, are reported in the status bar,
-  together with which images are affected, which version fixes them and, where it can be told,
-  whether the base image is the cause. By default only vulnerabilities with an available fix are
-  shown, because the others leave nothing to do.
-- *Ignore* takes a vulnerability out of the counts and reports on every system. Ignored ones are
+- Vulnerabilities from the severity you choose, critical by default, are reported in the status bar.
+  Select an image on the tab to see which package to update to which version. By default only
+  vulnerabilities with an available fix are shown, because the others leave nothing to do.
+- The crossed-out eye next to a vulnerability ignores it: it is taken out of the counts and reports on every system. Ignored ones are
   listed in the settings and can be restored there.
 - Results are kept in `%LocalAppData%\Meerkat\docker-image-scans.json` and can be deleted at any time.
 

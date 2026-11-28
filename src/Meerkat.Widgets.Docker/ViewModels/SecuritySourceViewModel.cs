@@ -18,6 +18,9 @@ public enum ScannerState
 
     /// <summary>The system or its Docker could not be asked.</summary>
     Failed,
+
+    /// <summary>The user did not ask for the images of this system to be scanned.</summary>
+    Off,
 }
 
 /// <param name="Id">The same id the containers of the system are kept under, <see cref="ContainerSourceOptions.LocalId"/> for this computer.</param>
@@ -59,7 +62,21 @@ public sealed partial class SecuritySourceViewModel(
 
     /// <summary>Set while several systems share the page, which then needs a heading per system.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsContentVisible))]
     private bool _showHeading;
+
+    /// <summary>False while the user has folded the section up; the system keeps being scanned all the same.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsContentVisible))]
+    private bool _isExpanded = true;
+
+    /// <summary>What a folded section still shows about its state, next to the heading.</summary>
+    [ObservableProperty]
+    private WidgetSeverity _severity;
+
+    /// <summary>How the images of the system are doing, in a few words next to the heading.</summary>
+    [ObservableProperty]
+    private string _summary = string.Empty;
 
     /// <summary>Scanner, age of its database and time of the last scan, in one line.</summary>
     [ObservableProperty]
@@ -90,6 +107,15 @@ public sealed partial class SecuritySourceViewModel(
 
     public bool IsRemote => options.IsRemote;
 
+    // Without a heading there is nothing to unfold the section with, so it is always shown then.
+    public bool IsContentVisible => IsExpanded || !ShowHeading;
+
+    /// <summary>
+    /// False for a system the user does not want scanned. It is listed all the same, so that the page
+    /// shows the same systems as the one with the containers, but nothing on it is asked or started.
+    /// </summary>
+    public bool IsScanned { get; init; } = true;
+
     public ScannerInfo? Scanner { get; private set; }
 
     public string InstallDescription => TrivyScanner.InstallDescription;
@@ -100,6 +126,13 @@ public sealed partial class SecuritySourceViewModel(
 
     public void Start()
     {
+        if (!IsScanned)
+        {
+            State = ScannerState.Off;
+            RefreshSummary();
+            return;
+        }
+
         if (_cancellation is not null)
         {
             return;
@@ -190,6 +223,11 @@ public sealed partial class SecuritySourceViewModel(
     /// <param name="onlyNew">Scans only images without a result; otherwise all of them.</param>
     public async Task ScanAsync(bool onlyNew, CancellationToken cancellationToken)
     {
+        if (!IsScanned)
+        {
+            return;
+        }
+
         await _work.WaitAsync(cancellationToken);
         IsScanning = true;
         try
@@ -248,6 +286,31 @@ public sealed partial class SecuritySourceViewModel(
 
         Changed?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>Puts into a few words and a colour what the heading of the section says about the system.</summary>
+    public void RefreshSummary()
+    {
+        var troubled = Images.Count(image => image.Reported.Count > 0);
+        Summary = State switch
+        {
+            ScannerState.Off => "not scanned",
+            ScannerState.Missing => "no scanner",
+            ScannerState.Failed => "not reachable",
+            ScannerState.Ready when Images.Count == 0 => "no images",
+            ScannerState.Ready => $"{Images.Count(image => image.IsScanned) - troubled} of {Images.Count} without findings",
+            _ => string.Empty,
+        };
+        Severity = State switch
+        {
+            ScannerState.Failed => WidgetSeverity.Warning,
+            ScannerState.Ready when Images.Any(image => image.Reported.Any(vulnerability => vulnerability.Severity == VulnerabilitySeverity.Critical)) => WidgetSeverity.Error,
+            ScannerState.Ready when troubled > 0 => WidgetSeverity.Warning,
+            _ => WidgetSeverity.Ok,
+        };
+    }
+
+    [RelayCommand]
+    private void ToggleExpanded() => IsExpanded = !IsExpanded;
 
     [RelayCommand]
     private async Task InstallAsync()

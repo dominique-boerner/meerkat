@@ -38,7 +38,7 @@ public static class DockerWidgetServiceCollectionExtensions
             var overlayState = provider.GetRequiredService<IOverlayState>();
 
             // The same code scans this computer and every other machine; only the way to reach them differs.
-            SecuritySourceViewModel CreateSource(DockerHost? host)
+            SecuritySourceViewModel CreateSource(DockerHost? host, bool isScanned)
             {
                 var shell = host is null ? shells.ForLocal(() => settings.Current.Distribution) : shells.ForHost(host);
                 var options = host is null
@@ -52,7 +52,10 @@ public static class DockerWidgetServiceCollectionExtensions
                     options,
                     overlayState,
                     TimeProvider.System,
-                    () => System.Windows.SystemParameters.PowerLineStatus == System.Windows.PowerLineStatus.Offline);
+                    () => System.Windows.SystemParameters.PowerLineStatus == System.Windows.PowerLineStatus.Offline)
+                {
+                    IsScanned = isScanned,
+                };
             }
 
             return new SecurityViewModel(settings, CreateSource, provider.GetRequiredService<IOverlayCommands>(), TimeProvider.System);

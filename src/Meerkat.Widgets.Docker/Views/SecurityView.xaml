@@ -13,48 +13,6 @@
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>
 
-        <!-- A vulnerability that is reported: what it is, where it is and what to do about it. -->
-        <DataTemplate x:Key="BannerTemplate">
-            <Border x:Name="Chrome"
-                    Background="{DynamicResource Overlay.WarningSurface}"
-                    BorderBrush="{DynamicResource Overlay.Warning}"
-                    BorderThickness="1"
-                    CornerRadius="6"
-                    Padding="12,8"
-                    Margin="0,0,0,8">
-                <DockPanel>
-                    <Button DockPanel.Dock="Right"
-                            Content="Ignore"
-                            VerticalAlignment="Top"
-                            Margin="10,0,0,0"
-                            ToolTip="Stop counting and reporting this vulnerability. It can be restored in the settings."
-                            Command="{Binding DataContext.IgnoreCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                            CommandParameter="{Binding}" />
-                    <TextBlock x:Name="Icon"
-                               DockPanel.Dock="Left"
-                               Text="&#xE7BA;"
-                               FontFamily="{DynamicResource Overlay.IconFont}"
-                               FontSize="14"
-                               Foreground="{DynamicResource Overlay.Warning}"
-                               VerticalAlignment="Top"
-                               Margin="0,2,10,0" />
-                    <StackPanel>
-                        <TextBlock Text="{Binding Headline}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                        <TextBlock Text="{Binding AffectedText}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0" />
-                        <TextBlock Text="{Binding AdviceText}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0" />
-                    </StackPanel>
-                </DockPanel>
-            </Border>
-            <DataTemplate.Triggers>
-                <DataTrigger Binding="{Binding IsCritical}" Value="True">
-                    <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Overlay.DangerSurface}" />
-                    <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource Overlay.Danger}" />
-                    <Setter TargetName="Icon" Property="Text" Value="&#xEA39;" />
-                    <Setter TargetName="Icon" Property="Foreground" Value="{DynamicResource Overlay.Danger}" />
-                </DataTrigger>
-            </DataTemplate.Triggers>
-        </DataTemplate>
-
         <DataTemplate x:Key="ImageRowTemplate">
             <Button Command="{Binding DataContext.SelectImageCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                     CommandParameter="{Binding}"
@@ -131,10 +89,61 @@
 
         <DataTemplate x:Key="SourceTemplate">
             <StackPanel Margin="0,0,0,10">
-                <DockPanel Margin="6,2,6,6" Visibility="{Binding ShowHeading, Converter={StaticResource BoolToVisibility}}">
-                    <TextBlock DockPanel.Dock="Right" Style="{DynamicResource Overlay.Hint}" Text="{Binding MetaText}" VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" />
-                </DockPanel>
+                <!-- The same heading as on the containers page: it folds the section up and down and, folded, still tells how the system is doing. -->
+                <Button Command="{Binding ToggleExpandedCommand}"
+                        Cursor="Hand"
+                        Focusable="False"
+                        Margin="0,0,0,6"
+                        HorizontalContentAlignment="Stretch"
+                        ToolTip="Show or hide the images of this system"
+                        ToolTipService.InitialShowDelay="900"
+                        Visibility="{Binding ShowHeading, Converter={StaticResource BoolToVisibility}}">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Chrome" Background="Transparent" CornerRadius="5" Padding="6,5,6,5">
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Right" Style="{DynamicResource Overlay.Hint}" Text="{Binding Summary}" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="Chevron"
+                                               Text="&#xE76C;"
+                                               FontFamily="{DynamicResource Overlay.IconFont}"
+                                               FontSize="9"
+                                               Foreground="{DynamicResource Overlay.TextMuted}"
+                                               VerticalAlignment="Center"
+                                               Width="14" />
+                                    <Ellipse x:Name="StateDot" Width="7" Height="7" Margin="0,1,8,0" VerticalAlignment="Center" Fill="{DynamicResource Overlay.Success}" />
+                                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" Foreground="{DynamicResource Overlay.Text}" />
+                                </DockPanel>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Overlay.SurfaceRaised}" />
+                                </Trigger>
+                                <DataTrigger Binding="{Binding IsExpanded}" Value="True">
+                                    <Setter TargetName="Chevron" Property="Text" Value="&#xE70D;" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Severity}" Value="Warning">
+                                    <Setter TargetName="StateDot" Property="Fill" Value="{DynamicResource Overlay.Warning}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Severity}" Value="Error">
+                                    <Setter TargetName="StateDot" Property="Fill" Value="{DynamicResource Overlay.Danger}" />
+                                </DataTrigger>
+                                <!-- A system that is not scanned is neither fine nor in trouble. -->
+                                <DataTrigger Binding="{Binding State}" Value="Off">
+                                    <Setter TargetName="StateDot" Property="Fill" Value="{DynamicResource Overlay.TextMuted}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding State}" Value="Missing">
+                                    <Setter TargetName="StateDot" Property="Fill" Value="{DynamicResource Overlay.TextMuted}" />
+                                </DataTrigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <StackPanel Visibility="{Binding IsContentVisible, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock x:Name="SectionMeta" Text="{Binding MetaText}" Style="{DynamicResource Overlay.Hint}" Margin="8,0,8,6"
+                           Visibility="{Binding ShowHeading, Converter={StaticResource BoolToVisibility}}" />
+                <TextBlock x:Name="OffHint" Text="The images of this system are not scanned. Switch that on in the Docker settings." Style="{DynamicResource Overlay.Hint}"
+                           Margin="8,0,8,4" Visibility="Collapsed" />
 
                 <TextBlock x:Name="CheckingHint" Text="Looking for a scanner …" Style="{DynamicResource Overlay.Hint}" Margin="8,4" Visibility="Collapsed" />
 
@@ -219,10 +228,18 @@
                     <ItemsControl x:Name="ImageList" ItemsSource="{Binding Images}" ItemTemplate="{StaticResource ImageRowTemplate}" Focusable="False" />
                     <TextBlock x:Name="NoImages" Text="No containers, so no images to scan" Style="{DynamicResource Overlay.Hint}" HorizontalAlignment="Center" Margin="0,6" Visibility="Collapsed" />
                 </StackPanel>
+                </StackPanel>
             </StackPanel>
             <DataTemplate.Triggers>
                 <DataTrigger Binding="{Binding State}" Value="Checking">
                     <Setter TargetName="CheckingHint" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding State}" Value="Off">
+                    <Setter TargetName="OffHint" Property="Visibility" Value="Visible" />
+                    <Setter TargetName="SectionMeta" Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding MetaText}" Value="">
+                    <Setter TargetName="SectionMeta" Property="Visibility" Value="Collapsed" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding State}" Value="Missing">
                     <Setter TargetName="MissingCard" Property="Visibility" Value="Visible" />
@@ -278,19 +295,6 @@
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
         <StackPanel>
-            <ItemsControl ItemsSource="{Binding Banners}" ItemTemplate="{StaticResource BannerTemplate}" Focusable="False" />
-            <TextBlock Text="{Binding MoreFindingsText}" FontSize="11" Foreground="{DynamicResource Overlay.TextMuted}" Margin="8,0,0,8">
-                <TextBlock.Style>
-                    <Style TargetType="TextBlock">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding MoreFindingsText}" Value="{x:Null}">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </TextBlock.Style>
-            </TextBlock>
-
             <ItemsControl ItemsSource="{Binding Sources}" ItemTemplate="{StaticResource SourceTemplate}" Focusable="False" />
 
             <!-- No system is scanned at all: say so instead of showing an empty page. -->
@@ -299,7 +303,7 @@
                     <Style TargetType="StackPanel">
                         <Setter Property="Visibility" Value="Collapsed" />
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding Sources.Count}" Value="0">
+                            <DataTrigger Binding="{Binding IsSwitchedOff}" Value="True">
                                 <Setter Property="Visibility" Value="Visible" />
                             </DataTrigger>
                         </Style.Triggers>

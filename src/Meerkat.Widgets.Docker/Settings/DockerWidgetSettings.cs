@@ -217,6 +217,9 @@ public sealed class DockerWidgetSettings
     /// <summary>Ids of the sources whose section the user folded up on the Docker page.</summary>
     public List<string> CollapsedSources { get; set; } = [];
 
+    /// <summary>The same for the page with the images, where each system can be folded up on its own.</summary>
+    public List<string> CollapsedImageSources { get; set; } = [];
+
     public DockerSecuritySettings Security { get; set; } = new();
 
     public static TimeSpan GetInterval(DockerHost host) => TimeSpan.FromSeconds(

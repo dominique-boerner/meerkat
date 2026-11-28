@@ -502,15 +502,11 @@ public sealed class ImageSecurityTests
     // ---- The tab and the shell ----
 
     [Fact]
-    public async Task A_critical_vulnerability_is_reported_with_its_cause()
+    public async Task A_critical_vulnerability_is_reported_to_the_shell()
     {
         var (security, source) = CreateSecurity();
         await source.RunDueWorkAsync(CancellationToken.None);
 
-        var banner = Assert.Single(security.Banners);
-        Assert.Equal("New: CVE-2026-0001 · critical · openssl", banner.Headline);
-        Assert.Equal("affects shop-app:dev · fix in 3.0.15", banner.AffectedText);
-        Assert.Equal("Cause: base image eclipse-temurin:21-jre – rebuild with a current base image", banner.AdviceText);
         Assert.True(security.HasAttention);
 
         Assert.Equal(new WidgetStatus("Images", "1/2", WidgetSeverity.Error), security.Status);
@@ -527,25 +523,23 @@ public sealed class ImageSecurityTests
         var (security, source) = CreateSecurity();
         await source.RunDueWorkAsync(CancellationToken.None);
 
-        Assert.Equal("affects shop-app:dev and postgres:16-alpine · fix in 3.0.15", Assert.Single(security.Banners).AffectedText);
         Assert.Equal("Critical vulnerability in 2 images", security.Alerts.Single().Title);
         Assert.Equal("0/2", security.Status!.Summary);
     }
 
     [Fact]
-    public async Task For_an_image_from_a_registry_the_advice_is_to_pull_a_newer_one()
+    public async Task An_image_from_a_registry_has_no_line_of_its_own()
     {
         _scanner.Findings[AppImage] = [];
         _scanner.Findings[DatabaseImage] = [CriticalOpenSsl];
-        var (security, source) = CreateSecurity();
+        var (_, source) = CreateSecurity();
         await source.RunDueWorkAsync(CancellationToken.None);
 
-        Assert.Equal("Fix: pull a newer version of the image", security.Banners.Single().AdviceText);
-        Assert.Equal("a newer image may carry the fixes · pull", source.Images.Single(image => image.Id == DatabaseImage).Subtitle);
+        Assert.Null(source.Images.Single(image => image.Id == DatabaseImage).Subtitle);
     }
 
     [Fact]
-    public async Task After_a_day_a_finding_is_no_longer_new()
+    public async Task The_report_remembers_since_when_a_vulnerability_is_known()
     {
         var (security, source) = CreateSecurity();
         await source.RunDueWorkAsync(CancellationToken.None);
@@ -553,7 +547,6 @@ public sealed class ImageSecurityTests
         _time.Now = _time.Now.AddHours(25);
         await source.RunDueWorkAsync(CancellationToken.None);
 
-        Assert.Equal("CVE-2026-0001 · critical · openssl", security.Banners.Single().Headline);
         Assert.Equal(new DateTimeOffset(2026, 11, 28, 14, 0, 0, TimeSpan.Zero), security.Alerts.Single().Since);
     }
 
@@ -563,9 +556,10 @@ public sealed class ImageSecurityTests
         var (security, source) = CreateSecurity();
         await source.RunDueWorkAsync(CancellationToken.None);
 
-        security.IgnoreCommand.Execute(security.Banners.Single());
+        security.SelectImageCommand.Execute(source.Images.Single(image => image.Id == AppImage));
+        security.IgnoreRowCommand.Execute(security.SelectedVulnerabilities.Single(row => row.Id == "CVE-2026-0001"));
 
-        Assert.Empty(security.Banners);
+        Assert.DoesNotContain(security.SelectedVulnerabilities, row => row.Id == "CVE-2026-0001");
         Assert.Empty(security.Alerts);
         Assert.False(security.HasAttention);
         Assert.Equal(new WidgetStatus("Images", "2/2", WidgetSeverity.Ok), security.Status);
@@ -585,7 +579,6 @@ public sealed class ImageSecurityTests
         var alert = Assert.Single(security.Alerts);
         Assert.Equal((WidgetSeverity.Warning, true), (alert.Severity, alert.Prominent));
         Assert.Equal("High vulnerability in 1 image", alert.Title);
-        Assert.Equal("Cause: a package the image's own build adds – update it and rebuild", security.Banners.Single().AdviceText);
     }
 
     [Fact]
@@ -595,7 +588,6 @@ public sealed class ImageSecurityTests
         var (security, source) = CreateSecurity();
         await source.RunDueWorkAsync(CancellationToken.None);
 
-        Assert.Empty(security.Banners);
         Assert.Empty(security.Alerts);
         Assert.Equal(new WidgetStatus("Images", "2/2", WidgetSeverity.Ok), security.Status);
         Assert.Equal(1, source.Images.Single(image => image.Id == AppImage).CriticalCount);
@@ -626,23 +618,56 @@ public sealed class ImageSecurityTests
     }
 
     [Fact]
-    public async Task Only_systems_the_user_chose_are_scanned()
+    public async Task Every_system_has_its_section_but_only_those_the_user_chose_are_scanned()
     {
-        var host = new DockerHost { Name = "build", Address = "build.example.org", ScanImages = true };
-        _settings.Current.RemoteHosts.Add(host);
-        _settings.Current.RemoteHosts.Add(new DockerHost { Name = "prod", Address = "prod.example.org" });
+        var build = new DockerHost { Name = "build", Address = "build.example.org", ScanImages = true };
+        var prod = new DockerHost { Name = "prod", Address = "prod.example.org" };
+        _settings.Current.RemoteHosts.Add(build);
+        _settings.Current.RemoteHosts.Add(prod);
         _settings.Current.Security.ScanLocalImages = false;
-        var created = new List<DockerHost?>();
-        var security = new SecurityViewModel(_settings, requested =>
-        {
-            created.Add(requested);
-            return CreateSource(isRemote: requested is not null, id: requested?.Id ?? ContainerSourceOptions.LocalId);
-        }, _overlayCommands, _time);
+        _settings.Current.CollapsedImageSources.Add(prod.Id);
+        var security = new SecurityViewModel(
+            _settings,
+            (host, isScanned) => CreateSource(isRemote: host is not null, id: host?.Id ?? ContainerSourceOptions.LocalId, isScanned, host?.Name ?? "Ubuntu"),
+            _overlayCommands,
+            _time);
 
         security.Start();
-        await security.StopAsync();
+        await security.Sources[1].RunDueWorkAsync(CancellationToken.None);
 
-        Assert.Equal([host], created);
+        // The same systems in the same order as on the containers page, each with a heading to fold it by.
+        Assert.Equal(["Ubuntu", "build", "prod"], security.Sources.Select(source => source.Label));
+        Assert.All(security.Sources, source => Assert.True(source.ShowHeading));
+        Assert.Equal([ScannerState.Off, ScannerState.Ready, ScannerState.Off], security.Sources.Select(source => source.State));
+        Assert.Equal(["not scanned", "1 of 2 without findings", "not scanned"], security.Sources.Select(source => source.Summary));
+        Assert.Equal([WidgetSeverity.Ok, WidgetSeverity.Error, WidgetSeverity.Ok], security.Sources.Select(source => source.Severity));
+        Assert.Equal("1/2", security.Status!.Summary);
+        Assert.False(security.IsSwitchedOff);
+
+        // A system that is not scanned is not asked anything, not even by "Scan now".
+        _scanner.Scanned.Clear();
+        await security.ScanNowCommand.ExecuteAsync(null);
+        Assert.Equal(2, _scanner.Scanned.Count);
+
+        // Folding is remembered per system, apart from the containers page.
+        Assert.Equal([true, true, false], security.Sources.Select(source => source.IsExpanded));
+        Assert.False(security.Sources[2].IsContentVisible);
+        security.Sources[1].ToggleExpandedCommand.Execute(null);
+        security.Sources[2].ToggleExpandedCommand.Execute(null);
+        Assert.Equal([build.Id], _settingsStore.Load<DockerWidgetSettings>("docker").CollapsedImageSources);
+        Assert.Empty(_settings.Current.CollapsedSources);
+        await security.StopAsync();
+    }
+
+    [Fact]
+    public void A_lone_system_has_no_heading_and_cannot_be_folded_away()
+    {
+        _settings.Current.CollapsedImageSources.Add(ContainerSourceOptions.LocalId);
+        var (security, source) = CreateSecurity();
+
+        Assert.False(source.ShowHeading);
+        Assert.True(source.IsContentVisible);
+        Assert.Single(security.Sources);
     }
 
     [Fact]
@@ -729,21 +754,24 @@ public sealed class ImageSecurityTests
         Assert.True(switchedOn);
     }
 
-    private SecuritySourceViewModel CreateSource(bool isRemote = false, string id = ContainerSourceOptions.LocalId) => new(
+    private SecuritySourceViewModel CreateSource(bool isRemote = false, string id = ContainerSourceOptions.LocalId, bool isScanned = true, string? label = null) => new(
         _scanner,
         _inventory,
         _store,
         _settings,
-        new SecuritySourceOptions(id, () => isRemote ? "build" : "Ubuntu", isRemote),
+        new SecuritySourceOptions(id, () => label ?? (isRemote ? "build" : "Ubuntu"), isRemote),
         _overlayState,
         _time,
-        () => _onBattery);
+        () => _onBattery)
+    {
+        IsScanned = isScanned,
+    };
 
     private (SecurityViewModel Security, SecuritySourceViewModel Source) CreateSecurity(bool start = true)
     {
         // The overlay stays hidden, so the source's own loop waits and the tests decide when work is done.
         var source = CreateSource();
-        var security = new SecurityViewModel(_settings, _ => source, _overlayCommands, _time);
+        var security = new SecurityViewModel(_settings, (_, _) => source, _overlayCommands, _time);
         if (start)
         {
             security.Start();

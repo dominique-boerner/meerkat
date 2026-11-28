@@ -7,20 +7,8 @@ using Meerkat.Widgets.Docker.Settings;
 
 namespace Meerkat.Widgets.Docker.ViewModels;
 
-/// <summary>A vulnerability grave enough to be reported, with every image it was found in.</summary>
-/// <param name="Headline">Id, severity and package.</param>
-/// <param name="AffectedText">Which images are affected and which version fixes it.</param>
-/// <param name="AdviceText">What the user can do about it.</param>
-public sealed record FindingViewModel(
-    string Id,
-    VulnerabilitySeverity Severity,
-    string Package,
-    bool HasFix,
-    int ImageCount,
-    DateTimeOffset FirstSeen,
-    string Headline,
-    string AffectedText,
-    string AdviceText)
+/// <summary>A vulnerability grave enough to be reported, counted once however many images it was found in.</summary>
+public sealed record FindingViewModel(VulnerabilitySeverity Severity, string Package, bool HasFix, int ImageCount, DateTimeOffset FirstSeen)
 {
     public bool IsCritical => Severity == VulnerabilitySeverity.Critical;
 }
@@ -31,14 +19,11 @@ public sealed record FindingViewModel(
 /// </summary>
 public sealed partial class SecurityViewModel(
     DockerSettingsSource settingsSource,
-    Func<DockerHost?, SecuritySourceViewModel> sourceFactory,
+    Func<DockerHost?, bool, SecuritySourceViewModel> sourceFactory,
     IOverlayCommands overlayCommands,
     TimeProvider timeProvider) : ObservableObject
 {
-    public const int MaxBanners = 3;
-
     private const string StatusLabel = "Images";
-    private static readonly TimeSpan NewFor = TimeSpan.FromHours(24);
 
     private bool _isStarted;
 
@@ -59,13 +44,14 @@ public sealed partial class SecurityViewModel(
     private string _metaText = string.Empty;
 
     [ObservableProperty]
-    private string? _moreFindingsText;
-
-    [ObservableProperty]
     private bool _isScanning;
 
     [ObservableProperty]
     private bool _canScan;
+
+    /// <summary>True while no system is scanned at all.</summary>
+    [ObservableProperty]
+    private bool _isSwitchedOff;
 
     /// <summary>True while something is reported; marks the tab.</summary>
     [ObservableProperty]
@@ -75,9 +61,6 @@ public sealed partial class SecurityViewModel(
     public event EventHandler? StatusChanged;
 
     public ObservableCollection<SecuritySourceViewModel> Sources { get; } = [];
-
-    /// <summary>The gravest findings, shown above the images.</summary>
-    public ObservableCollection<FindingViewModel> Banners { get; } = [];
 
     public ObservableCollection<VulnerabilityRowViewModel> SelectedVulnerabilities { get; } = [];
 
@@ -134,9 +117,6 @@ public sealed partial class SecurityViewModel(
     }
 
     [RelayCommand]
-    private void Ignore(FindingViewModel finding) => IgnoreVulnerability(finding.Id, finding.Package);
-
-    [RelayCommand]
     private void IgnoreRow(VulnerabilityRowViewModel row) => IgnoreVulnerability(row.Id, row.Package);
 
     [RelayCommand]
@@ -170,15 +150,13 @@ public sealed partial class SecurityViewModel(
 
     private void AddSources()
     {
+        // Every system the containers page shows gets its section here too, in the same order, whether its
+        // images are scanned or not: the two pages are two views of the same systems.
         var settings = settingsSource.Current;
-        if (settings.Security.ScanLocalImages)
+        AddSource(sourceFactory(null, settings.Security.ScanLocalImages));
+        foreach (var host in settings.RemoteHosts)
         {
-            AddSource(sourceFactory(null));
-        }
-
-        foreach (var host in settings.RemoteHosts.Where(host => host.ScanImages))
-        {
-            AddSource(sourceFactory(host));
+            AddSource(sourceFactory(host, host.ScanImages));
         }
 
         foreach (var source in Sources)
@@ -191,9 +169,37 @@ public sealed partial class SecurityViewModel(
 
     private void AddSource(SecuritySourceViewModel source)
     {
+        source.IsExpanded = !settingsSource.Current.CollapsedImageSources.Contains(source.Id);
         source.Changed += OnSourceChanged;
+        source.PropertyChanged += OnSourcePropertyChanged;
         Sources.Add(source);
         source.Start();
+    }
+
+    private void OnSourcePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (sender is not SecuritySourceViewModel source || e.PropertyName != nameof(SecuritySourceViewModel.IsExpanded))
+        {
+            return;
+        }
+
+        var collapsed = settingsSource.Current.CollapsedImageSources;
+        if (collapsed.Contains(source.Id) == !source.IsExpanded)
+        {
+            return;
+        }
+
+        if (source.IsExpanded)
+        {
+            collapsed.Remove(source.Id);
+        }
+        else
+        {
+            collapsed.Add(source.Id);
+        }
+
+        // Saved without announcing new settings, which would rebuild the systems and stop a running scan.
+        settingsSource.Save();
     }
 
     private async Task RemoveSourcesAsync()
@@ -204,6 +210,7 @@ public sealed partial class SecurityViewModel(
         foreach (var source in removed)
         {
             source.Changed -= OnSourceChanged;
+            source.PropertyChanged -= OnSourcePropertyChanged;
         }
 
         await Task.WhenAll(removed.Select(source => source.StopAsync()));
@@ -224,7 +231,6 @@ public sealed partial class SecurityViewModel(
     /// <summary>Derives everything the tab and the shell show from the images of the systems.</summary>
     private void Update()
     {
-        var now = timeProvider.GetLocalNow();
         var images = Sources.Where(source => source.State == ScannerState.Ready).SelectMany(source => source.Images).ToList();
         if (SelectedImage is { } selected && !images.Contains(selected))
         {
@@ -236,20 +242,19 @@ public sealed partial class SecurityViewModel(
             image.IsSelected = image == SelectedImage;
         }
 
+        foreach (var source in Sources)
+        {
+            source.RefreshSummary();
+        }
+
         UpdateSelection();
 
-        var findings = BuildFindings(now);
-        Replace(Banners, findings.Take(MaxBanners));
-        MoreFindingsText = (findings.Count - Banners.Count) switch
-        {
-            <= 0 => null,
-            1 => "1 more reported vulnerability – select an image to see it",
-            var more => $"{more} more reported vulnerabilities – select an image to see them",
-        };
+        var findings = BuildFindings();
         HasAttention = findings.Count > 0;
         IsScanning = Sources.Any(source => source.IsScanning);
         CanScan = Sources.Any(source => source.State == ScannerState.Ready) && !IsScanning;
         MetaText = Sources.Count == 1 ? Sources[0].MetaText : string.Empty;
+        IsSwitchedOff = Sources.All(source => source.State == ScannerState.Off);
 
         UpdateStatus(images, findings);
     }
@@ -282,9 +287,9 @@ public sealed partial class SecurityViewModel(
             };
     }
 
-    private List<FindingViewModel> BuildFindings(DateTimeOffset now)
+    /// <summary>The vulnerabilities grave enough to be reported, each once however many images it is in.</summary>
+    private List<FindingViewModel> BuildFindings()
     {
-        var showSystem = Sources.Count > 1;
         var reported =
             from source in Sources
             where source.State == ScannerState.Ready
@@ -297,52 +302,16 @@ public sealed partial class SecurityViewModel(
             .Select(group =>
             {
                 var entries = group.ToList();
-                var gravest = entries.MaxBy(entry => entry.Vulnerability.Severity).Vulnerability;
-                var firstSeen = entries.Min(entry => entry.Source.GetFirstSeen(group.Key));
-                var imageNames = entries
-                    .Select(entry => showSystem ? $"{entry.Image.Name} ({entry.Source.Label})" : entry.Image.Name)
-                    .Distinct()
-                    .ToList();
-                var packages = Join([.. entries.Select(entry => entry.Vulnerability.Package).Distinct()]);
-                var fixedVersion = entries.Select(entry => entry.Vulnerability.FixedVersion).FirstOrDefault(version => !string.IsNullOrWhiteSpace(version));
-                var prefix = now - firstSeen < NewFor ? "New: " : string.Empty;
-
                 return new FindingViewModel(
-                    group.Key,
-                    gravest.Severity,
-                    packages,
-                    fixedVersion is not null,
-                    imageNames.Count,
-                    firstSeen,
-                    $"{prefix}{group.Key} · {gravest.Severity.ToString().ToLowerInvariant()} · {packages}",
-                    $"affects {Join(imageNames)} · {(fixedVersion is null ? "no fix yet" : $"fix in {fixedVersion}")}",
-                    DescribeAdvice(entries[0].Image.Details, entries[0].Vulnerability));
+                    entries.Max(entry => entry.Vulnerability.Severity),
+                    Join([.. entries.Select(entry => entry.Vulnerability.Package).Distinct()]),
+                    entries.Any(entry => entry.Vulnerability.HasFix),
+                    entries.Select(entry => (entry.Source.Id, entry.Image.Id)).Distinct().Count(),
+                    entries.Min(entry => entry.Source.GetFirstSeen(group.Key)));
             })
             .OrderByDescending(finding => finding.Severity)
-            .ThenByDescending(finding => finding.FirstSeen)
-            .ThenBy(finding => finding.Id, StringComparer.Ordinal)];
+            .ThenByDescending(finding => finding.FirstSeen)];
     }
-
-    private static string DescribeAdvice(ImageDetails image, Vulnerability vulnerability)
-    {
-        if (image.BaseImage is { } baseImage && vulnerability.LayerId is { } layer && image.BaseLayers.Contains(layer))
-        {
-            return $"Cause: base image {baseImage} – rebuild with a current base image";
-        }
-
-        // Where Docker does not tell whether the image was built here, a newer one may simply be waiting to be pulled.
-        if (!image.IsOwnBuild)
-        {
-            return image.BaseLayers.Count > 0
-                ? "Cause: a package the image adds to its base – pull a newer image or rebuild it"
-                : "Fix: pull a newer version of the image";
-        }
-
-        return image.BaseLayers.Count > 0
-            ? "Cause: a package the image's own build adds – update it and rebuild"
-            : "Fix: rebuild the image with current packages and base image";
-    }
-
     private void UpdateStatus(IReadOnlyList<ImageRowViewModel> images, IReadOnlyList<FindingViewModel> findings)
     {
         var scanned = images.Where(image => image.IsScanned).ToList();

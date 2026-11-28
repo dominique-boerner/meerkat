@@ -418,6 +418,7 @@ public sealed partial class DockerSettingsPageViewModel : ObservableObject
         MaxLogLines = _original.MaxLogLines,
         Machines = [.. Machines.Select(option => option.ToUse())],
         CollapsedSources = [.. _original.CollapsedSources],
+        CollapsedImageSources = [.. _original.CollapsedImageSources],
         Security = new DockerSecuritySettings
         {
             ScanLocalImages = ScanLocalImages,
