@@ -2,24 +2,99 @@
   <img src="assets/logo/meerkat-tile.svg" width="112" height="112" alt="Meerkat logo">
 </p>
 
-# Meerkat
+<h1 align="center">Meerkat</h1>
 
-[![CI](https://github.com/dominique-boerner/meerkat/actions/workflows/ci.yml/badge.svg)](https://github.com/dominique-boerner/meerkat/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/dominique-boerner/meerkat)](https://github.com/dominique-boerner/meerkat/releases/latest)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+<p align="center">
+  <strong>A quiet status bar for your development environment on Windows.</strong><br>
+  Docker in WSL without Docker Desktop, pipelines, servers and services at a glance,<br>
+  and one hotkey to act on them.
+</p>
 
-Meerkat keeps an eye on your development environment so you do not have to. A small status bar in the
-corner of the screen shows whether your containers and pipelines are fine. It stays out of the way:
-it never takes the keyboard focus from your editor, and as long as everything works it is one quiet
-line.
+<p align="center">
+  <a href="https://github.com/dominique-boerner/meerkat/releases/latest"><img src="https://img.shields.io/github/v/release/dominique-boerner/meerkat?label=release" alt="Latest release"></a>
+  <a href="https://github.com/dominique-boerner/meerkat/actions/workflows/ci.yml"><img src="https://github.com/dominique-boerner/meerkat/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D4" alt="Platform: Windows 10 and 11">
+  <img src="https://img.shields.io/badge/.NET-10-512BD4" alt=".NET 10">
+</p>
 
-When something breaks, the status bar says what and since when. A click on it, or a global hotkey,
-opens a side panel with the details and the actions to deal with it.
+<p align="center">
+  <a href="#quick-start"><strong>Quick start</strong></a> ·
+  <a href="#features">Features</a> ·
+  <a href="#usage">Usage</a> ·
+  <a href="#writing-widgets">Plugins</a> ·
+  <a href="CHANGELOG.md">Changelog</a>
+</p>
 
-Meerkat is a generic shell that hosts **widgets**. It ships with widgets for Docker containers running
-inside WSL, for GitLab and GitHub, for servers reachable over SSH, for the status of external
-services, and for notes.
+<p align="center">
+  <img src="docs/images/meerkat.gif" width="920" alt="The status bar is one quiet line, shows a card when a pipeline fails, and the action search runs the pipeline again">
+</p>
 
+## Quick start
+
+You need Windows 10 or 11. For the Docker widget, Docker Engine runs inside a WSL 2 distribution;
+Docker Desktop is not required.
+
+1. Download `Meerkat-<version>-win-x64-self-contained.zip` from the
+   [latest release](https://github.com/dominique-boerner/meerkat/releases/latest).
+2. Extract it anywhere and run `Meerkat.exe`. There is no installer.
+3. Press `Ctrl+Alt+M` for the panel and `Ctrl+Alt+A` to search actions.
+
+The smaller archive without `-self-contained` needs the
+[.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0). More under
+[Requirements](#requirements) and [Installation](#installation).
+
+## What it does
+
+Meerkat keeps an eye on your development environment so you do not have to. As long as everything
+works it is one quiet line in the corner of the screen, and it never takes the keyboard focus from
+your editor.
+
+- **Says what broke, and since when.** A card below the bar names the failed pipeline, the
+  unreachable server or the vulnerable image. A click opens a side panel with the details.
+- **Lets you act from where you are.** A hotkey opens a search for actions above any window, so
+  restarting a container takes a few keystrokes and no window.
+- **Comes with widgets** for Docker in WSL and on other machines, GitLab and GitHub, servers over
+  SSH, the status of external services, and notes.
+- **Takes more as [plugins](#writing-widgets)**, built without the source of Meerkat.
+
+**What it does with your access.** Meerkat has no telemetry and no account. It contacts GitHub to
+look for its own updates, and otherwise only the servers and services you entered; the image scan
+lets Trivy fetch its vulnerability database. Tokens and passwords are kept
+in the Windows Credential Manager, never in the settings file. Other machines are read-only until you
+allow more for each of them.
+## A look at it
+
+**Act without leaving your editor.** `Ctrl+Alt+A` finds what the widgets can do. Actions that change
+something ask before they touch another machine, and cannot be chosen where you only allowed reading.
+
+<img src="docs/images/action-search-targets.png" width="700" alt="The action search asking which container to restart, with the containers of three machines">
+
+**Know what is in your images.** The Docker widget scans the images of your containers with Trivy,
+on this computer and on the machines you choose, and reports critical vulnerabilities in the status
+bar.
+
+<img src="docs/images/docker-security.png" width="700" alt="The Security tab of the Docker page with the images of three systems and their findings">
+
+**Set up once.** Other machines are entered a single time and chosen by each widget. Every change
+applies at once, and everything is kept in one readable file.
+
+<img src="docs/images/settings-docker.png" width="700" alt="The Docker page of the settings with a machine that is read-only and scanned">
+
+The pictures show sample data.
+
+## Contents
+
+- [Quick start](#quick-start)
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Usage](#usage): [action search](#action-search), [configuration](#configuration), [other machines](#other-machines), [updates](#updates)
+- The widgets: [Docker](#docker-widget), [Git](#git-widget), [Server](#server-widget), [Services](#services-widget), [Notes](#notes-widget)
+- [Building from source](#building-from-source)
+- [Writing widgets](#writing-widgets)
+- [Releases](#releases)
+- [License](#license)
 ## Features
 
 **Shell**
@@ -114,21 +189,31 @@ that on in the settings under *General*.
 | Action | Default hotkey |
 |---|---|
 | Open or close the panel | `Ctrl+Alt+M` |
+| Search actions | `Ctrl+Alt+A` |
 | Hide or show Meerkat | `Ctrl+Alt+H` |
 | Write a quick note | `Ctrl+Alt+N` |
 | Add a task | `Ctrl+Alt+T` |
 
-Click the status bar to open or close the panel, or click a card to open the panel on the page it
-belongs to. A card you have seen can be put away: click the cross that appears under the pointer,
-or right-click it to mute it for an hour or until tomorrow. It stays
-away until its alert is over or has something new to say. The chip in the bar keeps its colour
-meanwhile, as an outline: filled means news, outlined means known. Drag the tabs of the panel up or down to change the order of the widgets; the chips in
-the status bar follow it. Drag the status bar by the handle at its end to move it, for example away from the buttons of maximized windows;
-its place is remembered relative to the screen, so it is the same on every monitor and resolution.
-The panel stays open while you work in other windows. It closes when you press `Esc` inside it,
-press the hotkey again or use its close button. Drag its left edge to change the width, for example to read long log
-lines; a double-click on the edge restores the default. Both actions are also available from the tray icon.
+The status bar:
 
+- Click it to open or close the panel, or click a card to open the panel on the page it belongs to.
+- Put away a card you have seen with the cross that appears under the pointer, or right-click it to
+  mute it for an hour or until tomorrow. It stays away until its alert is over or has something new
+  to say. The chip in the bar keeps its colour meanwhile, as an outline: filled means news, outlined
+  means known.
+- Drag it by the handle at its end to move it, for example away from the buttons of maximized
+  windows. Its place is remembered relative to the screen, so it is the same on every monitor and
+  resolution.
+
+The panel:
+
+- It stays open while you work in other windows, and closes when you press `Esc` inside it, press
+  the hotkey again or use its close button.
+- Drag its tabs up or down to change the order of the widgets; the chips in the status bar follow.
+- Drag its left edge to change the width, for example to read long log lines; a double-click on the
+  edge restores the default.
+
+Opening the panel and hiding Meerkat are also available from the tray icon.
 ### Action search
 
 `Ctrl+Alt+A` opens the action search above any window. Type a few letters of what you want to do;
