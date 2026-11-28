@@ -18,7 +18,8 @@ public sealed partial class DockerWidgetViewModel(
     IOverlayCommands overlayCommands,
     DockerSettingsSource settingsSource,
     TimeProvider timeProvider,
-    Func<DockerHost, IContainerProvider>? remoteProviderFactory = null) : ObservableObject
+    Func<DockerHost, IContainerProvider>? remoteProviderFactory = null,
+    SecurityViewModel? security = null) : ObservableObject
 {
     private const string StatusLabel = "Docker";
 
@@ -34,6 +35,11 @@ public sealed partial class DockerWidgetViewModel(
     [ObservableProperty]
     private string _summary = string.Empty;
 
+    /// <summary>Which of the two tabs of the page is shown: the containers or the scan of their images.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsContainersTab))]
+    private bool _isSecurityTab;
+
     /// <summary>Raised when <see cref="Status"/> or <see cref="Alerts"/> changed.</summary>
     public event EventHandler? StatusChanged;
 
@@ -44,6 +50,14 @@ public sealed partial class DockerWidgetViewModel(
     public WidgetStatus? Status { get; private set; }
 
     public IReadOnlyList<WidgetAlert> Alerts { get; private set; } = [];
+
+    /// <summary>The scan of the images; null where the page was built without it.</summary>
+    public SecurityViewModel? Security => security;
+
+    /// <summary>What the scan of the images adds to the status bar, next to the entry for the containers.</summary>
+    public IReadOnlyList<WidgetStatus> AdditionalStatuses => security?.Status is { } status ? [status] : [];
+
+    public bool IsContainersTab => !IsSecurityTab;
 
     public void Start()
     {
@@ -56,6 +70,11 @@ public sealed partial class DockerWidgetViewModel(
         settingsSource.Changed += OnSettingsChanged;
         AddSource(new ContainerSourceViewModel(localProvider, overlayState, overlayCommands, ContainerSourceOptions.ForLocal(settingsSource), timeProvider));
         AddRemoteSources();
+        if (security is not null)
+        {
+            security.StatusChanged += OnSourceStatusChanged;
+            security.Start();
+        }
     }
 
     public async Task StopAsync()
@@ -70,6 +89,12 @@ public sealed partial class DockerWidgetViewModel(
         var sources = Sources.ToList();
         Sources.Clear();
         await Task.WhenAll(sources.Select(RemoveSourceAsync));
+        if (security is not null)
+        {
+            security.StatusChanged -= OnSourceStatusChanged;
+            await security.StopAsync();
+        }
+
         LogPanel = null;
     }
 
@@ -78,6 +103,12 @@ public sealed partial class DockerWidgetViewModel(
 
     [RelayCommand]
     private void OpenSettings() => overlayCommands.OpenSettings();
+
+    [RelayCommand]
+    private void ShowContainers() => IsSecurityTab = false;
+
+    [RelayCommand]
+    private void ShowSecurity() => IsSecurityTab = true;
 
     private void AddRemoteSources()
     {
@@ -203,7 +234,7 @@ public sealed partial class DockerWidgetViewModel(
         var running = reporting.Sum(source => source.RunningCount);
         var total = reporting.Sum(source => source.TotalCount);
 
-        Alerts = [.. Sources.SelectMany(source => source.Alerts)];
+        Alerts = [.. Sources.SelectMany(source => source.Alerts), .. security?.Alerts ?? []];
         Status = reporting.Count == 0
             ? null
             : new WidgetStatus(

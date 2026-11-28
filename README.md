@@ -45,6 +45,8 @@ services, and for notes.
 - Live log viewer with text filter, stdout/stderr toggles, pause, and a bounded line buffer
 - Warns about containers stuck in a restart loop and reports an unreachable WSL distribution, host
   or Docker daemon as an error
+- Scans the images of your containers for known vulnerabilities with Trivy, once a day and whenever
+  a new image appears, and reports critical ones with the image they come from and what fixes them
 
 **Git widget**
 
@@ -154,10 +156,10 @@ The widget talks to Docker exclusively through `wsl.exe`, for example
 by default the WSL default distribution is used. The user Meerkat runs the commands as must be
 allowed to use Docker without `sudo`.
 
-To see the containers of another machine, add it under *Other machines (SSH)* in the same settings.
+To see the containers of another machine, add it under *Docker systems* in the same settings.
 Meerkat then runs the docker CLI on that machine through the OpenSSH client of Windows, signing in
 with your SSH agent or configuration, a key file, or a password kept in the Windows Credential
-Manager. Nothing is installed on the host and no port besides SSH is used.
+Manager. Nothing is installed on the host unless you ask for it, and no port besides SSH is used.
 
 - The user you sign in with must be allowed to use Docker there, which usually means being in the
   `docker` group. Bear in mind that this is close to root access to the host.
@@ -167,6 +169,29 @@ Manager. Nothing is installed on the host and no port besides SSH is used.
   restart anything. Allow that per host if you want it.
 - Every request opens an SSH connection, so other machines are asked every 20 seconds by default
   instead of every few seconds.
+
+#### Scanning images for vulnerabilities
+
+The *Security* tab of the Docker page lists the images your containers were created from and what
+[Trivy](https://trivy.dev) finds in them. The scan runs on the machine the images are on, be it the
+WSL distribution or another machine, so no image is copied anywhere.
+
+- Meerkat uses a Trivy that is already installed. Where there is none, *Install Trivy* on the tab or
+  in the settings downloads a fixed release from Trivy's GitHub releases, checks it against a
+  checksum that is part of Meerkat, and puts it into `~/.local/share/meerkat/trivy` of the user
+  Meerkat works as. That needs no root rights and changes nothing else on the machine; delete the
+  folder to remove it again.
+- All images are scanned once a day at the time set in the settings, and a new image as soon as it
+  appears. This computer is not scanned while it runs on battery unless you ask for a scan.
+- Another machine is only scanned if you switch that on where the machine is edited. A scan takes
+  some of its processor time, which is why it is off by default.
+- Vulnerabilities from the severity you choose, critical by default, are reported in the status bar,
+  together with which images are affected, which version fixes them and, where it can be told,
+  whether the base image is the cause. By default only vulnerabilities with an available fix are
+  shown, because the others leave nothing to do.
+- *Ignore* takes a vulnerability out of the counts and reports on every system. Ignored ones are
+  listed in the settings and can be restored there.
+- Results are kept in `%LocalAppData%\Meerkat\docker-image-scans.json` and can be deleted at any time.
 
 ### Git widget
 

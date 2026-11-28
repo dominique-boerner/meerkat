@@ -15,6 +15,7 @@
     <SolidColorBrush x:Key="Overlay.Warning" Color="#FFF2B84B" />
     <SolidColorBrush x:Key="Overlay.WarningSurface" Color="#1FF2B84B" />
     <SolidColorBrush x:Key="Overlay.Danger" Color="#FFFF6B6B" />
+    <SolidColorBrush x:Key="Overlay.DangerSurface" Color="#1FFF6B6B" />
 
     <FontFamily x:Key="Overlay.MonoFont">Cascadia Mono, Consolas</FontFamily>
     <FontFamily x:Key="Overlay.IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>

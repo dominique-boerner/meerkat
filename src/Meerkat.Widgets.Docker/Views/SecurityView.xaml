@@ -1,0 +1,348 @@
+<UserControl x:Class="Meerkat.Widgets.Docker.Views.SecurityView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Foreground="{DynamicResource Overlay.Text}"
+             FontSize="12">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+
+        <Style x:Key="Mono" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{DynamicResource Overlay.MonoFont}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+
+        <!-- A vulnerability that is reported: what it is, where it is and what to do about it. -->
+        <DataTemplate x:Key="BannerTemplate">
+            <Border x:Name="Chrome"
+                    Background="{DynamicResource Overlay.WarningSurface}"
+                    BorderBrush="{DynamicResource Overlay.Warning}"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Padding="12,8"
+                    Margin="0,0,0,8">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right"
+                            Content="Ignore"
+                            VerticalAlignment="Top"
+                            Margin="10,0,0,0"
+                            ToolTip="Stop counting and reporting this vulnerability. It can be restored in the settings."
+                            Command="{Binding DataContext.IgnoreCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding}" />
+                    <TextBlock x:Name="Icon"
+                               DockPanel.Dock="Left"
+                               Text="&#xE7BA;"
+                               FontFamily="{DynamicResource Overlay.IconFont}"
+                               FontSize="14"
+                               Foreground="{DynamicResource Overlay.Warning}"
+                               VerticalAlignment="Top"
+                               Margin="0,2,10,0" />
+                    <StackPanel>
+                        <TextBlock Text="{Binding Headline}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding AffectedText}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0" />
+                        <TextBlock Text="{Binding AdviceText}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsCritical}" Value="True">
+                    <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Overlay.DangerSurface}" />
+                    <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource Overlay.Danger}" />
+                    <Setter TargetName="Icon" Property="Text" Value="&#xEA39;" />
+                    <Setter TargetName="Icon" Property="Foreground" Value="{DynamicResource Overlay.Danger}" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <DataTemplate x:Key="ImageRowTemplate">
+            <Button Command="{Binding DataContext.SelectImageCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                    CommandParameter="{Binding}"
+                    Cursor="Hand"
+                    Focusable="False"
+                    HorizontalContentAlignment="Stretch"
+                    ToolTip="{Binding ScanError}">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="RowChrome" Background="Transparent" CornerRadius="4" Padding="8,6,8,6">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="72" />
+                                    <ColumnDefinition Width="72" />
+                                    <ColumnDefinition Width="78" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Name}" Style="{StaticResource Mono}" FontSize="12" Foreground="{DynamicResource Overlay.Text}" />
+                                    <TextBlock Text="{Binding Subtitle}" FontSize="10.5" Foreground="{DynamicResource Overlay.TextMuted}" TextTrimming="CharacterEllipsis">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Subtitle}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+
+                                <Border x:Name="CriticalPill" Grid.Column="1" Width="52" Height="18" CornerRadius="9" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock x:Name="CriticalText" Text="{Binding CriticalCount}" Style="{StaticResource Mono}" HorizontalAlignment="Center" Foreground="{DynamicResource Overlay.TextMuted}" />
+                                </Border>
+                                <Border x:Name="HighPill" Grid.Column="2" Width="52" Height="18" CornerRadius="9" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock x:Name="HighText" Text="{Binding HighCount}" Style="{StaticResource Mono}" HorizontalAlignment="Center" Foreground="{DynamicResource Overlay.TextMuted}" />
+                                </Border>
+                                <TextBlock x:Name="ScanLabel" Grid.Column="3" Text="{Binding ScanText}" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                           Foreground="{DynamicResource Overlay.TextMuted}" />
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="RowChrome" Property="Background" Value="{DynamicResource Overlay.SurfaceRaised}" />
+                            </Trigger>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                <Setter TargetName="RowChrome" Property="Background" Value="{DynamicResource Overlay.Hover}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding HasCritical}" Value="True">
+                                <Setter TargetName="CriticalPill" Property="Background" Value="{DynamicResource Overlay.DangerSurface}" />
+                                <Setter TargetName="CriticalText" Property="Foreground" Value="{DynamicResource Overlay.Danger}" />
+                                <Setter TargetName="CriticalText" Property="FontWeight" Value="SemiBold" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding HasHigh}" Value="True">
+                                <Setter TargetName="HighPill" Property="Background" Value="{DynamicResource Overlay.WarningSurface}" />
+                                <Setter TargetName="HighText" Property="Foreground" Value="{DynamicResource Overlay.Warning}" />
+                                <Setter TargetName="HighText" Property="FontWeight" Value="SemiBold" />
+                            </DataTrigger>
+                            <!-- Nothing is known about an image that was never scanned; a zero would claim otherwise. -->
+                            <DataTrigger Binding="{Binding IsScanned}" Value="False">
+                                <Setter TargetName="CriticalText" Property="Text" Value="·" />
+                                <Setter TargetName="HighText" Property="Text" Value="·" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsScanning}" Value="True">
+                                <Setter TargetName="ScanLabel" Property="Foreground" Value="{DynamicResource Overlay.Accent}" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+        </DataTemplate>
+
+        <DataTemplate x:Key="SourceTemplate">
+            <StackPanel Margin="0,0,0,10">
+                <DockPanel Margin="6,2,6,6" Visibility="{Binding ShowHeading, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock DockPanel.Dock="Right" Style="{DynamicResource Overlay.Hint}" Text="{Binding MetaText}" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" />
+                </DockPanel>
+
+                <TextBlock x:Name="CheckingHint" Text="Looking for a scanner …" Style="{DynamicResource Overlay.Hint}" Margin="8,4" Visibility="Collapsed" />
+
+                <!-- Without a scanner there is nothing to show but the way to get one. -->
+                <Border x:Name="MissingCard" Background="{DynamicResource Overlay.SurfaceRaised}" CornerRadius="6" Padding="14,12" Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock Text="No scanner found" FontWeight="SemiBold" FontSize="13" />
+                        <TextBlock Text="{Binding Label, StringFormat='Meerkat scans images with Trivy, and {0} has none yet.'}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                        <TextBlock Text="{Binding InstallDescription}" Style="{DynamicResource Overlay.Hint}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <Button Style="{DynamicResource Overlay.PrimaryButton}" Content="Install Trivy" Command="{Binding InstallCommand}" />
+                            <TextBlock Text="Installing …" Margin="12,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource Overlay.TextMuted}"
+                                       Visibility="{Binding IsInstalling, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <StackPanel x:Name="ErrorCard" Margin="8,4,4,0">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ErrorMessage}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Left" Text="&#xEA39;" FontFamily="{DynamicResource Overlay.IconFont}" FontSize="13"
+                                   Foreground="{DynamicResource Overlay.Danger}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <TextBlock Text="{Binding ErrorMessage}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    </DockPanel>
+                    <Border Background="{DynamicResource Overlay.SurfaceRaised}" CornerRadius="4" Padding="8,6" Margin="0,8,0,6">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ErrorDetail}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Text="{Binding ErrorDetail}" FontFamily="{DynamicResource Overlay.MonoFont}" FontSize="10.5" Foreground="{DynamicResource Overlay.TextMuted}"
+                                   TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="58" />
+                    </Border>
+                </StackPanel>
+
+                <StackPanel x:Name="ReadyContent" Visibility="Collapsed">
+                    <Border Background="{DynamicResource Overlay.WarningSurface}" BorderBrush="{DynamicResource Overlay.Warning}" BorderThickness="1" CornerRadius="6" Padding="12,8" Margin="0,0,0,8">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding StaleDatabaseText}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="Update" VerticalAlignment="Center" Command="{Binding UpdateDatabaseCommand}" />
+                            <TextBlock DockPanel.Dock="Left" Text="&#xE7BA;" FontFamily="{DynamicResource Overlay.IconFont}" FontSize="14"
+                                       Foreground="{DynamicResource Overlay.Warning}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <StackPanel>
+                                <TextBlock Text="{Binding StaleDatabaseText}" FontWeight="SemiBold" />
+                                <TextBlock Text="Results may be incomplete." FontSize="11" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <Grid Margin="8,2,8,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="72" />
+                            <ColumnDefinition Width="72" />
+                            <ColumnDefinition Width="78" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Style="{DynamicResource Overlay.ColumnHeader}" Text="IMAGE" />
+                        <TextBlock Grid.Column="1" Style="{DynamicResource Overlay.ColumnHeader}" Text="CRITICAL" HorizontalAlignment="Center" />
+                        <TextBlock Grid.Column="2" Style="{DynamicResource Overlay.ColumnHeader}" Text="HIGH" HorizontalAlignment="Center" />
+                        <TextBlock Grid.Column="3" Style="{DynamicResource Overlay.ColumnHeader}" Text="SCAN" HorizontalAlignment="Right" />
+                    </Grid>
+                    <ItemsControl x:Name="ImageList" ItemsSource="{Binding Images}" ItemTemplate="{StaticResource ImageRowTemplate}" Focusable="False" />
+                    <TextBlock x:Name="NoImages" Text="No containers, so no images to scan" Style="{DynamicResource Overlay.Hint}" HorizontalAlignment="Center" Margin="0,6" Visibility="Collapsed" />
+                </StackPanel>
+            </StackPanel>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding State}" Value="Checking">
+                    <Setter TargetName="CheckingHint" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding State}" Value="Missing">
+                    <Setter TargetName="MissingCard" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding State}" Value="Ready">
+                    <Setter TargetName="ReadyContent" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Images.Count}" Value="0">
+                    <Setter TargetName="NoImages" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <DataTemplate x:Key="VulnerabilityRowTemplate">
+            <Border BorderBrush="{DynamicResource Overlay.Border}" BorderThickness="0,1,0,0" Padding="10,6,4,6" ToolTip="{Binding Title}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150" />
+                        <ColumnDefinition Width="62" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="110" />
+                        <ColumnDefinition Width="110" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Button Grid.Column="0" Cursor="Hand" Focusable="False" HorizontalAlignment="Left" ToolTip="Open the description in the browser"
+                            Command="{Binding DataContext.OpenVulnerabilityCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <TextBlock x:Name="IdText" Text="{Binding Id}" Style="{StaticResource Mono}" Foreground="{DynamicResource Overlay.Text}" />
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="IdText" Property="TextDecorations" Value="Underline" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                    <TextBlock x:Name="Severity" Grid.Column="1" Text="{Binding SeverityText}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource Overlay.Warning}" />
+                    <TextBlock Grid.Column="2" Text="{Binding Package}" Style="{StaticResource Mono}" Margin="0,0,10,0" />
+                    <TextBlock Grid.Column="3" Text="{Binding InstalledVersion}" Style="{StaticResource Mono}" Foreground="{DynamicResource Overlay.TextMuted}" Margin="0,0,10,0" />
+                    <TextBlock Grid.Column="4" Text="{Binding FixedVersion}" Style="{StaticResource Mono}" Foreground="{DynamicResource Overlay.Success}" />
+                    <Button Grid.Column="5" Style="{DynamicResource Overlay.IconButton}" Content="&#xED1A;" ToolTip="Ignore this vulnerability"
+                            Command="{Binding DataContext.IgnoreRowCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                </Grid>
+            </Border>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsCritical}" Value="True">
+                    <Setter TargetName="Severity" Property="Foreground" Value="{DynamicResource Overlay.Danger}" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+        <StackPanel>
+            <ItemsControl ItemsSource="{Binding Banners}" ItemTemplate="{StaticResource BannerTemplate}" Focusable="False" />
+            <TextBlock Text="{Binding MoreFindingsText}" FontSize="11" Foreground="{DynamicResource Overlay.TextMuted}" Margin="8,0,0,8">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding MoreFindingsText}" Value="{x:Null}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+
+            <ItemsControl ItemsSource="{Binding Sources}" ItemTemplate="{StaticResource SourceTemplate}" Focusable="False" />
+
+            <!-- No system is scanned at all: say so instead of showing an empty page. -->
+            <StackPanel Margin="8,4">
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Sources.Count}" Value="0">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+                <TextBlock Text="Scanning images is switched off" FontWeight="SemiBold" FontSize="13" />
+                <TextBlock Text="Choose in the settings which Docker systems Meerkat scans for vulnerabilities." TextWrapping="Wrap" Margin="0,4,0,10" />
+                <Button Content="Open settings" HorizontalAlignment="Left" Command="{Binding OpenSettingsCommand}" />
+            </StackPanel>
+
+            <StackPanel Margin="0,6,0,0" Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Style="{DynamicResource Overlay.ColumnHeader}" FontSize="10.5" Text="{Binding SelectionTitle}" Margin="8,0,0,6" TextTrimming="CharacterEllipsis" />
+                <Border BorderBrush="{DynamicResource Overlay.Border}" BorderThickness="1" CornerRadius="6">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedVulnerabilities.Count}" Value="0">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel>
+                        <Grid Margin="10,6,4,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="62" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="110" />
+                                <ColumnDefinition Width="110" />
+                                <ColumnDefinition Width="26" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{DynamicResource Overlay.Hint}" Text="CVE" />
+                            <TextBlock Grid.Column="1" Style="{DynamicResource Overlay.Hint}" Text="Severity" />
+                            <TextBlock Grid.Column="2" Style="{DynamicResource Overlay.Hint}" Text="Package" />
+                            <TextBlock Grid.Column="3" Style="{DynamicResource Overlay.Hint}" Text="Installed" />
+                            <TextBlock Grid.Column="4" Style="{DynamicResource Overlay.Hint}" Text="Fixed in" />
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding SelectedVulnerabilities}" ItemTemplate="{StaticResource VulnerabilityRowTemplate}" Focusable="False" />
+                    </StackPanel>
+                </Border>
+                <TextBlock Text="{Binding SelectionHint}" Style="{DynamicResource Overlay.Hint}" TextWrapping="Wrap" Margin="8,6,0,0" />
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

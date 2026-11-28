@@ -4,8 +4,37 @@
              xmlns:views="clr-namespace:Meerkat.Widgets.Docker.Views"
              Foreground="{DynamicResource Overlay.Text}"
              FontSize="12">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+
+        <!-- The two tabs of the page. Tag carries whether the tab is the one shown. -->
+        <Style x:Key="TabButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Foreground" Value="{DynamicResource Overlay.TextMuted}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome" Background="Transparent" CornerRadius="5" Padding="12,5">
+                            <ContentPresenter VerticalAlignment="Center" TextElement.FontSize="12.5" TextElement.FontWeight="SemiBold" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource Overlay.Text}" />
+                            </Trigger>
+                            <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Overlay.Hover}" />
+                                <Setter Property="Foreground" Value="{DynamicResource Overlay.Text}" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition>
                 <RowDefinition.Style>
@@ -16,14 +45,51 @@
                             <DataTrigger Binding="{Binding LogPanel}" Value="{x:Null}">
                                 <Setter Property="Height" Value="0" />
                             </DataTrigger>
+                            <DataTrigger Binding="{Binding IsSecurityTab}" Value="True">
+                                <Setter Property="Height" Value="0" />
+                            </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </RowDefinition.Style>
             </RowDefinition>
         </Grid.RowDefinitions>
 
+        <Border Grid.Row="0" BorderBrush="{DynamicResource Overlay.Border}" BorderThickness="0,0,0,1" Padding="0,0,0,8" Margin="0,0,0,10">
+            <Border.Style>
+                <!-- Without the scan of the images there is only one thing to show, and no need to choose. -->
+                <Style TargetType="Border">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Security}" Value="{x:Null}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                    <Button Style="{StaticResource TabButton}" Content="Containers" Tag="{Binding IsContainersTab}" Command="{Binding ShowContainersCommand}" />
+                    <Button Style="{StaticResource TabButton}" Tag="{Binding IsSecurityTab}" Command="{Binding ShowSecurityCommand}" Margin="4,0,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Security" />
+                            <Ellipse Width="6" Height="6" Margin="7,1,0,0" VerticalAlignment="Center" Fill="{DynamicResource Overlay.Danger}"
+                                     Visibility="{Binding Security.HasAttention, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"
+                            Visibility="{Binding IsSecurityTab, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Style="{DynamicResource Overlay.Hint}" Text="{Binding Security.MetaText}" VerticalAlignment="Center" Margin="0,0,12,0" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="Scanning …" FontSize="11" Foreground="{DynamicResource Overlay.Accent}" VerticalAlignment="Center" Margin="0,0,12,0"
+                               Visibility="{Binding Security.IsScanning, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                    <Button Content="Scan now" Command="{Binding Security.ScanNowCommand}" IsEnabled="{Binding Security.CanScan, FallbackValue=False}" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
         <!-- One section per Docker instance: the local one first, then those on other machines. -->
-        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False"
+                      Visibility="{Binding IsContainersTab, Converter={StaticResource BoolToVisibility}}">
             <ItemsControl ItemsSource="{Binding Sources}" Focusable="False">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
@@ -33,7 +99,10 @@
             </ItemsControl>
         </ScrollViewer>
 
-        <DockPanel Grid.Row="1" Margin="0,14,0,0">
+        <views:SecurityView Grid.Row="1" DataContext="{Binding Security}"
+                            Visibility="{Binding DataContext.IsSecurityTab, RelativeSource={RelativeSource AncestorType=views:DockerWidgetView}, Converter={StaticResource BoolToVisibility}}" />
+
+        <DockPanel Grid.Row="2" Margin="0,14,0,0" Visibility="{Binding IsContainersTab, Converter={StaticResource BoolToVisibility}}">
             <DockPanel DockPanel.Dock="Top" Margin="8,0,0,6">
                 <TextBlock DockPanel.Dock="Left"
                            Style="{DynamicResource Overlay.ColumnHeader}"

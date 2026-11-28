@@ -22,85 +22,85 @@
         </Style>
     </UserControl.Resources>
     <StackPanel>
-    <TextBlock Style="{DynamicResource Overlay.ColumnHeader}" FontSize="10.5" Text="THIS MACHINE (WSL)" Margin="0,0,0,4" />
-    <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="162" />
-            <ColumnDefinition Width="142" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-
-        <TextBlock Grid.Row="0" Grid.Column="0" Style="{DynamicResource Overlay.FormLabel}" Text="WSL distribution" />
-        <ComboBox Grid.Row="0" Grid.Column="1" Margin="0,5"
-                  ItemsSource="{Binding Distributions}"
-                  SelectedItem="{Binding SelectedDistribution}"
-                  DisplayMemberPath="DisplayName" />
-        <TextBlock Grid.Row="0" Grid.Column="2" Style="{DynamicResource Overlay.Hint}" Margin="10,0,0,0"
-                   FontFamily="{DynamicResource Overlay.MonoFont}" Text="wsl -d &lt;name&gt;" />
-
-        <TextBlock Grid.Row="1" Grid.Column="0" Style="{DynamicResource Overlay.FormLabel}" Text="Container list interval" />
-        <TextBox Grid.Row="1" Grid.Column="1" Margin="0,5" FontFamily="{DynamicResource Overlay.MonoFont}"
-                 Text="{Binding ListIntervalSeconds}" />
-        <TextBlock Grid.Row="1" Grid.Column="2" Style="{DynamicResource Overlay.Hint}" Margin="10,0,0,0" Text="seconds" />
-
-        <TextBlock Grid.Row="2" Grid.Column="0" Style="{DynamicResource Overlay.FormLabel}" Text="Stats interval" />
-        <TextBox Grid.Row="2" Grid.Column="1" Margin="0,5" FontFamily="{DynamicResource Overlay.MonoFont}"
-                 Text="{Binding StatsIntervalSeconds}" />
-        <TextBlock Grid.Row="2" Grid.Column="2" Style="{DynamicResource Overlay.Hint}" Margin="10,0,0,0" Text="seconds" />
-
-        <TextBlock Grid.Row="3" Grid.Column="0" Style="{DynamicResource Overlay.FormLabel}" Text="Max. log lines" />
-        <TextBox Grid.Row="3" Grid.Column="1" Margin="0,5" FontFamily="{DynamicResource Overlay.MonoFont}"
-                 Text="{Binding MaxLogLines}" />
-        <TextBlock Grid.Row="3" Grid.Column="2" Style="{DynamicResource Overlay.Hint}" Margin="10,0,0,0"
-                   Text="Older lines are discarded" />
-    </Grid>
-
-    <DockPanel Margin="0,20,0,6">
+    <!-- Every machine Docker is watched on, this computer and others alike: where it is and whether it can scan images. -->
+    <DockPanel Margin="0,0,0,6">
         <Button DockPanel.Dock="Right" Content="+ Add host" Command="{Binding AddHostCommand}"
                 Visibility="{Binding CanAddHosts, Converter={StaticResource BoolToVisibility}}" />
-        <TextBlock Style="{DynamicResource Overlay.ColumnHeader}" FontSize="10.5" Text="OTHER MACHINES (SSH)" VerticalAlignment="Center" />
+        <TextBlock Style="{DynamicResource Overlay.ColumnHeader}" FontSize="10.5" Text="DOCKER SYSTEMS" VerticalAlignment="Center" />
     </DockPanel>
 
-    <ItemsControl ItemsSource="{Binding RemoteHosts}" Focusable="False">
+    <ItemsControl ItemsSource="{Binding Systems}" Focusable="False">
         <ItemsControl.ItemTemplate>
             <DataTemplate>
                 <Border BorderBrush="{DynamicResource Overlay.Border}" BorderThickness="0,0,0,1" Padding="0,7">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="150" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Overlay.Text}" />
-                        <TextBlock Grid.Column="1" Text="{Binding Address}" FontFamily="{DynamicResource Overlay.MonoFont}" FontSize="11" VerticalAlignment="Center"
-                                   TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Overlay.TextMuted}" />
-                        <TextBlock x:Name="Access" Grid.Column="2" Text="read-only" FontSize="11" Margin="12,0" VerticalAlignment="Center" Foreground="{DynamicResource Overlay.TextMuted}" />
-                        <StackPanel Grid.Column="3" Orientation="Horizontal">
-                            <Button Style="{StaticResource LinkButton}" Content="Edit" Margin="0,0,12,0"
-                                    Command="{Binding DataContext.EditHostCommand, ElementName=Root}" CommandParameter="{Binding}" />
-                            <Button Style="{StaticResource LinkButton}" Content="Remove"
-                                    Command="{Binding DataContext.RemoveHostCommand, ElementName=Root}" CommandParameter="{Binding}" />
-                        </StackPanel>
-                    </Grid>
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Foreground="{DynamicResource Overlay.Text}" />
+
+                            <!-- This computer reaches Docker through WSL, so its place in the list holds the distribution. -->
+                            <StackPanel x:Name="LocalDetail" Grid.Column="1" Orientation="Horizontal" Visibility="Collapsed">
+                                <TextBlock Text="WSL" FontSize="11" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="{DynamicResource Overlay.TextMuted}" />
+                                <ComboBox Width="150"
+                                          ItemsSource="{Binding DataContext.Distributions, ElementName=Root}"
+                                          SelectedItem="{Binding DataContext.SelectedDistribution, ElementName=Root}"
+                                          DisplayMemberPath="DisplayName" />
+                            </StackPanel>
+                            <StackPanel x:Name="RemoteDetail" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Address}" FontFamily="{DynamicResource Overlay.MonoFont}" FontSize="11" VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Overlay.TextMuted}" />
+                                <TextBlock Text="{Binding AccessText, StringFormat='· {0}'}" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource Overlay.TextMuted}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0">
+                                <TextBlock Text="{Binding ScannerText}" FontSize="11" VerticalAlignment="Center" Foreground="{DynamicResource Overlay.TextMuted}" />
+                                <Button Content="Install Trivy" Margin="8,0,0,0" Command="{Binding InstallCommand}"
+                                        ToolTip="{Binding DataContext.InstallDescription, ElementName=Root}"
+                                        Visibility="{Binding CanInstall, Converter={StaticResource BoolToVisibility}}" />
+                            </StackPanel>
+
+                            <StackPanel x:Name="HostActions" Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button Style="{StaticResource LinkButton}" Content="Edit" Margin="0,0,12,0"
+                                        Command="{Binding DataContext.EditHostCommand, ElementName=Root}" CommandParameter="{Binding Host}" />
+                                <Button Style="{StaticResource LinkButton}" Content="Remove"
+                                        Command="{Binding DataContext.RemoveHostCommand, ElementName=Root}" CommandParameter="{Binding Host}" />
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Text="{Binding Error}" Margin="130,4,0,0" FontSize="11" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="46"
+                                   Foreground="{DynamicResource Overlay.Danger}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Error}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
                 </Border>
                 <DataTemplate.Triggers>
-                    <DataTrigger Binding="{Binding AllowActions}" Value="True">
-                        <Setter TargetName="Access" Property="Text" Value="start/stop allowed" />
+                    <DataTrigger Binding="{Binding IsLocal}" Value="True">
+                        <Setter TargetName="LocalDetail" Property="Visibility" Value="Visible" />
+                        <Setter TargetName="RemoteDetail" Property="Visibility" Value="Collapsed" />
+                        <Setter TargetName="HostActions" Property="Visibility" Value="Collapsed" />
                     </DataTrigger>
                 </DataTemplate.Triggers>
             </DataTemplate>
         </ItemsControl.ItemTemplate>
     </ItemsControl>
 
-    <TextBlock Style="{DynamicResource Overlay.Hint}" TextWrapping="Wrap" Margin="0,2,0,0"
-               Text="Shows the containers of other machines by running the docker CLI there over SSH. The user you sign in with must be allowed to use Docker on the host, which usually means being in its docker group." />
+    <TextBlock Style="{DynamicResource Overlay.Hint}" TextWrapping="Wrap" Margin="0,4,0,0"
+               Text="Other machines are reached by running the docker CLI there over SSH. The user you sign in with must be allowed to use Docker on the host, which usually means being in its docker group." />
+    <TextBlock Style="{DynamicResource Overlay.Hint}" TextWrapping="Wrap" Margin="0,4,0,0"
+               Text="{Binding InstallDescription, StringFormat='Install Trivy: {0}'}"
+               Visibility="{Binding CanInstallScanners, Converter={StaticResource BoolToVisibility}}" />
 
 
     <Border Margin="0,12,0,0"
@@ -175,10 +175,13 @@
                     <TextBlock Style="{StaticResource FieldLabel}" Text="Ask the host" />
                     <ComboBox ItemsSource="{Binding HostIntervals}" SelectedItem="{Binding SelectedHostInterval}" DisplayMemberPath="DisplayName" />
                 </StackPanel>
-                <CheckBox Grid.Column="1" VerticalAlignment="Bottom" Margin="0,0,0,5" IsChecked="{Binding AllowActions}" Content="Allow starting, stopping and restarting containers" />
+                <StackPanel Grid.Column="1" VerticalAlignment="Bottom" Margin="0,0,0,2">
+                    <CheckBox IsChecked="{Binding AllowActions}" Content="Allow starting, stopping and restarting containers" />
+                    <CheckBox IsChecked="{Binding ScanHostImages}" Content="Scan the images of this host for vulnerabilities" Margin="0,6,0,0" />
+                </StackPanel>
             </Grid>
             <TextBlock Style="{DynamicResource Overlay.Hint}" Margin="0,6,0,0" TextWrapping="Wrap"
-                       Text="Every request opens an SSH connection, so other machines are asked less often than this one. Without the permission above the host is only read, which is the safe choice for a server others rely on." />
+                       Text="Every request opens an SSH connection, so other machines are asked less often than this one. Without the permission above the host is only read, which is the safe choice for a server others rely on. A scan runs on the host itself and takes some of its processor time once a day." />
 
             <StackPanel Margin="0,10,0,0">
                 <StackPanel.Style>
@@ -203,5 +206,89 @@
             </StackPanel>
         </StackPanel>
     </Border>
+
+    <TextBlock Style="{DynamicResource Overlay.ColumnHeader}" FontSize="10.5" Text="CONTAINERS" Margin="0,22,0,4" />
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="200" />
+            <ColumnDefinition Width="142" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Grid.Column="0" Style="{DynamicResource Overlay.FormLabel}" Text="Container list interval" />
+        <TextBox Grid.Row="0" Grid.Column="1" Margin="0,5" FontFamily="{DynamicResource Overlay.MonoFont}"
+                 Text="{Binding ListIntervalSeconds}" />
+        <TextBlock Grid.Row="0" Grid.Column="2" Style="{DynamicResource Overlay.Hint}" Margin="10,0,0,0" Text="seconds, on this computer" />
+
+        <TextBlock Grid.Row="1" Grid.Column="0" Style="{DynamicResource Overlay.FormLabel}" Text="Stats interval" />
+        <TextBox Grid.Row="1" Grid.Column="1" Margin="0,5" FontFamily="{DynamicResource Overlay.MonoFont}"
+                 Text="{Binding StatsIntervalSeconds}" />
+        <TextBlock Grid.Row="1" Grid.Column="2" Style="{DynamicResource Overlay.Hint}" Margin="10,0,0,0" Text="seconds, on this computer" />
+
+        <TextBlock Grid.Row="2" Grid.Column="0" Style="{DynamicResource Overlay.FormLabel}" Text="Max. log lines" />
+        <TextBox Grid.Row="2" Grid.Column="1" Margin="0,5" FontFamily="{DynamicResource Overlay.MonoFont}"
+                 Text="{Binding MaxLogLines}" />
+        <TextBlock Grid.Row="2" Grid.Column="2" Style="{DynamicResource Overlay.Hint}" Margin="10,0,0,0"
+                   Text="Older lines are discarded" />
+    </Grid>
+
+    <TextBlock Style="{DynamicResource Overlay.ColumnHeader}" FontSize="10.5" Text="SECURITY" Margin="0,22,0,4" />
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="200" />
+            <ColumnDefinition Width="142" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Grid.Column="0" Style="{DynamicResource Overlay.FormLabel}" Text="Report vulnerabilities from" />
+        <ComboBox Grid.Row="0" Grid.Column="1" Margin="0,5" ItemsSource="{Binding Thresholds}" SelectedItem="{Binding SelectedThreshold}" DisplayMemberPath="DisplayName" />
+        <TextBlock Grid.Row="0" Grid.Column="2" Style="{DynamicResource Overlay.Hint}" Margin="10,0,0,0" Text="shown in the status bar" />
+
+        <TextBlock Grid.Row="1" Grid.Column="0" Style="{DynamicResource Overlay.FormLabel}" Text="Scan all images daily at" />
+        <TextBox Grid.Row="1" Grid.Column="1" Margin="0,5" FontFamily="{DynamicResource Overlay.MonoFont}" Text="{Binding DailyScanTime}" />
+        <TextBlock Grid.Row="1" Grid.Column="2" Style="{DynamicResource Overlay.Hint}" Margin="10,0,0,0" Text="hours:minutes; new images are scanned right away" />
+    </Grid>
+    <CheckBox Margin="0,8,0,0" IsChecked="{Binding ScanLocalImages}" Content="Scan the images of this computer" />
+    <CheckBox Margin="0,8,0,0" IsChecked="{Binding OnlyFixable}" Content="Only vulnerabilities with an available fix" />
+    <CheckBox Margin="0,8,0,0" IsChecked="{Binding SkipOnBattery}" Content="Do not scan this computer on battery power" />
+    <TextBlock Style="{DynamicResource Overlay.Hint}" TextWrapping="Wrap" Margin="0,8,0,0"
+               Text="Images are scanned with Trivy on the machine they are on. Whether another machine is scanned is decided where that machine is edited." />
+
+    <Button Style="{StaticResource LinkButton}" Content="{Binding IgnoredLinkText}" HorizontalAlignment="Left" Margin="0,10,0,0" Command="{Binding ToggleIgnoredListCommand}" />
+    <StackPanel Margin="0,6,0,0" Visibility="{Binding IsIgnoredListOpen, Converter={StaticResource BoolToVisibility}}">
+        <ItemsControl ItemsSource="{Binding Ignored}" Focusable="False">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border BorderBrush="{DynamicResource Overlay.Border}" BorderThickness="0,0,0,1" Padding="0,6">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding Id}" FontFamily="{DynamicResource Overlay.MonoFont}" FontSize="11" VerticalAlignment="Center" Foreground="{DynamicResource Overlay.Text}" />
+                            <TextBlock Grid.Column="1" Text="{Binding Package}" FontFamily="{DynamicResource Overlay.MonoFont}" FontSize="11" VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Overlay.TextMuted}" />
+                            <TextBlock Grid.Column="2" Text="{Binding IgnoredAt, StringFormat='ignored {0:d}'}" FontSize="11" Margin="12,0" VerticalAlignment="Center" Foreground="{DynamicResource Overlay.TextMuted}" />
+                            <Button Grid.Column="3" Style="{StaticResource LinkButton}" Content="Restore"
+                                    Command="{Binding DataContext.RestoreIgnoredCommand, ElementName=Root}" CommandParameter="{Binding}" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Style="{DynamicResource Overlay.Hint}" TextWrapping="Wrap" Margin="0,6,0,0"
+                   Text="Ignored vulnerabilities are neither counted nor reported, on any system. Ignore one on the Docker page, next to where it is listed." />
+    </StackPanel>
     </StackPanel>
 </UserControl>

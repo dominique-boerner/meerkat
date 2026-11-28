@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Globalization;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -6,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using Meerkat.Abstractions;
 using Meerkat.Ssh;
 using Meerkat.Widgets.Docker.Containers;
+using Meerkat.Widgets.Docker.Security;
 using Meerkat.Widgets.Docker.ViewModels;
 using Meerkat.Widgets.Docker.Views;
 
@@ -15,13 +17,14 @@ public sealed class DockerSettingsPage(
     DockerSettingsSource settingsSource,
     IWslDistributionCatalog distributionCatalog,
     ISshClient ssh,
-    IWidgetSecretStore secrets) : IWidgetSettingsPage
+    IWidgetSecretStore secrets,
+    IDockerShellFactory shells) : IWidgetSettingsPage
 {
     private DockerSettingsPageViewModel? _viewModel;
 
     public FrameworkElement CreateView()
     {
-        _viewModel = new DockerSettingsPageViewModel(settingsSource.Current, ssh, host => secrets.Read(host.SecretKey) is { Length: > 0 });
+        _viewModel = new DockerSettingsPageViewModel(settingsSource.Current, ssh, host => secrets.Read(host.SecretKey) is { Length: > 0 }, shells);
         _ = _viewModel.LoadDistributionsAsync(distributionCatalog);
         return new DockerSettingsView { DataContext = _viewModel };
     }
@@ -56,9 +59,114 @@ public sealed record AuthenticationOption(SshAuthentication Authentication, stri
 
 public sealed record HostIntervalOption(double Seconds, string DisplayName);
 
+public sealed record ThresholdOption(ReportThreshold Threshold, string DisplayName);
+
+/// <summary>
+/// A machine Docker runs on, as listed in the settings: this computer or another one. Tells whether the
+/// machine has a scanner for images and offers to install one.
+/// </summary>
+public sealed partial class DockerSystemViewModel(DockerHost? host, IImageScanner? scanner, Action<DockerSystemViewModel>? installed = null) : ObservableObject
+{
+    public const string LocalName = "This computer";
+
+    [ObservableProperty]
+    private string _scannerText = string.Empty;
+
+    [ObservableProperty]
+    private bool _canInstall;
+
+    [ObservableProperty]
+    private bool _isBusy;
+
+    [ObservableProperty]
+    private string? _error;
+
+    /// <summary>Null for this computer.</summary>
+    public DockerHost? Host => host;
+
+    public bool IsLocal => host is null;
+
+    public bool IsRemote => host is not null;
+
+    public string Name => host?.DisplayName ?? LocalName;
+
+    public string Address => host?.Address ?? string.Empty;
+
+    public string AccessText => host switch
+    {
+        null => string.Empty,
+        { AllowActions: true, ScanImages: true } => "start/stop allowed · scanned",
+        { AllowActions: true } => "start/stop allowed",
+        { ScanImages: true } => "read-only · scanned",
+        _ => "read-only",
+    };
+
+    /// <summary>Asks the machine whether it has a scanner. Does nothing where machines cannot be asked.</summary>
+    public async Task DetectAsync()
+    {
+        if (scanner is null)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        CanInstall = false;
+        Error = null;
+        ScannerText = "checking …";
+        try
+        {
+            var info = await scanner.DetectAsync(CancellationToken.None);
+            ScannerText = info is null ? "no scanner" : $"{info.Name} {info.Version}";
+            CanInstall = info is null;
+        }
+        catch (Exception exception) when (exception is ScannerException or DockerShellException or ArgumentException)
+        {
+            // Whether the machine can be reached is the business of the Docker page; here it only means "unknown".
+            ScannerText = "scanner unknown";
+            Error = exception.Message;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task InstallAsync()
+    {
+        if (scanner is null)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        CanInstall = false;
+        Error = null;
+        ScannerText = "installing …";
+        try
+        {
+            var info = await scanner.InstallAsync(CancellationToken.None);
+            ScannerText = $"{info.Name} {info.Version} installed";
+            installed?.Invoke(this);
+            OnPropertyChanged(nameof(AccessText));
+        }
+        catch (Exception exception) when (exception is ScannerException or DockerShellException or ArgumentException)
+        {
+            ScannerText = "no scanner";
+            CanInstall = true;
+            Error = exception is ScannerException failure ? $"{failure.Message} {failure.Detail}" : exception.Message;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+}
+
 public sealed partial class DockerSettingsPageViewModel : ObservableObject
 {
     private readonly ISshClient? _ssh;
+    private readonly IDockerShellFactory? _shells;
     private readonly Func<DockerHost, bool> _isPasswordStored;
     private DockerHost? _editing;
 
@@ -116,6 +224,28 @@ public sealed partial class DockerSettingsPageViewModel : ObservableObject
     private bool _allowActions;
 
     [ObservableProperty]
+    private bool _scanHostImages;
+
+    [ObservableProperty]
+    private bool _scanLocalImages;
+
+    [ObservableProperty]
+    private ThresholdOption _selectedThreshold;
+
+    /// <summary>Time of day of the daily scan, as typed: "HH:mm".</summary>
+    [ObservableProperty]
+    private string _dailyScanTime;
+
+    [ObservableProperty]
+    private bool _onlyFixable;
+
+    [ObservableProperty]
+    private bool _skipOnBattery;
+
+    [ObservableProperty]
+    private bool _isIgnoredListOpen;
+
+    [ObservableProperty]
     private string? _formError;
 
     [ObservableProperty]
@@ -125,9 +255,15 @@ public sealed partial class DockerSettingsPageViewModel : ObservableObject
     private bool _isChecking;
 
     /// <param name="ssh">Used to check a host before it is added; without it hosts cannot be added.</param>
-    public DockerSettingsPageViewModel(DockerWidgetSettings settings, ISshClient? ssh = null, Func<DockerHost, bool>? hasStoredPassword = null)
+    /// <param name="shells">Used to look for a scanner on the systems and to install one; without it neither is offered.</param>
+    public DockerSettingsPageViewModel(
+        DockerWidgetSettings settings,
+        ISshClient? ssh = null,
+        Func<DockerHost, bool>? hasStoredPassword = null,
+        IDockerShellFactory? shells = null)
     {
         _ssh = ssh;
+        _shells = shells;
         _isPasswordStored = hasStoredPassword ?? (_ => false);
         _collapsedSources = [.. settings.CollapsedSources];
 
@@ -143,7 +279,44 @@ public sealed partial class DockerSettingsPageViewModel : ObservableObject
         {
             RemoteHosts.Add(host.Clone());
         }
+
+        var security = settings.Security;
+        _scanLocalImages = security.ScanLocalImages;
+        _selectedThreshold = Thresholds.First(option => option.Threshold == security.ReportFrom);
+        _dailyScanTime = security.DailyScanTime;
+        _onlyFixable = security.OnlyFixable;
+        _skipOnBattery = security.SkipOnBattery;
+        foreach (var ignored in security.Ignored)
+        {
+            Ignored.Add(ignored);
+        }
+
+        Ignored.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IgnoredLinkText));
+        RemoteHosts.CollectionChanged += OnRemoteHostsChanged;
+        Systems.Add(CreateSystem(null));
+        foreach (var host in RemoteHosts)
+        {
+            Systems.Add(CreateSystem(host));
+        }
     }
+
+    /// <summary>This computer first, then the other machines: everything Docker is watched on.</summary>
+    public ObservableCollection<DockerSystemViewModel> Systems { get; } = [];
+
+    public ObservableCollection<IgnoredVulnerability> Ignored { get; } = [];
+
+    public IReadOnlyList<ThresholdOption> Thresholds { get; } =
+    [
+        new(ReportThreshold.Critical, "Critical"),
+        new(ReportThreshold.High, "High and critical"),
+        new(ReportThreshold.Never, "Never"),
+    ];
+
+    public string IgnoredLinkText => $"Manage ignored vulnerabilities ({Ignored.Count})";
+
+    public string InstallDescription => TrivyScanner.InstallDescription;
+
+    public bool CanInstallScanners => _shells is not null;
 
     public ObservableCollection<DistributionOption> Distributions { get; } = [];
 
@@ -197,7 +370,24 @@ public sealed partial class DockerSettingsPageViewModel : ObservableObject
         MaxLogLines = MaxLogLines,
         RemoteHosts = [.. RemoteHosts.Select(host => host.Clone())],
         CollapsedSources = [.. _collapsedSources],
+        Security = new DockerSecuritySettings
+        {
+            ScanLocalImages = ScanLocalImages,
+            ReportFrom = SelectedThreshold.Threshold,
+            DailyScanTime = DockerSecuritySettings.TryParseTime(DailyScanTime, out var time)
+                ? time.ToString("HH:mm", CultureInfo.InvariantCulture)
+                : throw new InvalidOperationException("Enter the time of the daily scan as hours and minutes, for example 12:30."),
+            OnlyFixable = OnlyFixable,
+            SkipOnBattery = SkipOnBattery,
+            Ignored = [.. Ignored],
+        },
     };
+
+    [RelayCommand]
+    private void ToggleIgnoredList() => IsIgnoredListOpen = !IsIgnoredListOpen;
+
+    [RelayCommand]
+    private void RestoreIgnored(IgnoredVulnerability ignored) => Ignored.Remove(ignored);
 
     [RelayCommand]
     private void AddHost()
@@ -295,6 +485,7 @@ public sealed partial class DockerSettingsPageViewModel : ObservableObject
         HasStoredPassword = PendingPasswords.ContainsKey(host.Id) || _isPasswordStored(host);
         SelectedHostInterval = HostIntervals.FirstOrDefault(option => option.Seconds >= host.IntervalSeconds) ?? HostIntervals[^1];
         AllowActions = host.AllowActions;
+        ScanHostImages = host.ScanImages;
         SetError(null);
         IsFormOpen = true;
     }
@@ -324,6 +515,7 @@ public sealed partial class DockerSettingsPageViewModel : ObservableObject
             KeyFile = UsesKeyFile && KeyFile.Trim().Length > 0 ? KeyFile.Trim() : null,
             IntervalSeconds = SelectedHostInterval.Seconds,
             AllowActions = AllowActions,
+            ScanImages = ScanHostImages,
         };
 
         try
@@ -338,6 +530,54 @@ public sealed partial class DockerSettingsPageViewModel : ObservableObject
 
         SetError(null);
         return host;
+    }
+
+    private DockerSystemViewModel CreateSystem(DockerHost? host)
+    {
+        IImageScanner? scanner = _shells is null ? null
+            : host is null ? new TrivyScanner(_shells.ForLocal(() => SelectedDistribution.Name))
+            : new TrivyScanner(_shells.ForHost(host, PendingPasswords.GetValueOrDefault(host.Id)));
+
+        // A scanner the user just installed is meant to be used, so scanning is switched on with it.
+        var system = new DockerSystemViewModel(host, scanner, installed =>
+        {
+            if (installed.Host is { } remote)
+            {
+                remote.ScanImages = true;
+            }
+            else
+            {
+                ScanLocalImages = true;
+            }
+        });
+        _ = system.DetectAsync();
+        return system;
+    }
+
+    private void OnRemoteHostsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        // Hosts that stay keep their entry, and with it what is known about their scanner.
+        foreach (var gone in Systems.Where(system => system.Host is { } host && !RemoteHosts.Contains(host)).ToList())
+        {
+            Systems.Remove(gone);
+        }
+
+        for (var index = 0; index < RemoteHosts.Count; index++)
+        {
+            if (Systems.All(system => system.Host != RemoteHosts[index]))
+            {
+                Systems.Insert(Math.Min(index + 1, Systems.Count), CreateSystem(RemoteHosts[index]));
+            }
+        }
+    }
+
+    partial void OnSelectedDistributionChanged(DistributionOption value)
+    {
+        // Another distribution is another machine as far as its programs go.
+        if (Systems.Count > 0)
+        {
+            _ = Systems[0].DetectAsync();
+        }
     }
 
     private void SetError(string? message, string? detail = null)

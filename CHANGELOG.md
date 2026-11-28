@@ -9,6 +9,25 @@ The section of a version becomes the text of its GitHub release and is what Meer
 
 ## [Unreleased]
 
+### Added
+
+- The Docker widget scans the images of your containers for known vulnerabilities with Trivy. A new
+  *Security* tab lists the images with their critical and high findings and, for a selected image,
+  what to update to which version. Critical vulnerabilities are reported in the status bar with the
+  affected images and, where it can be told, the base image that causes them. Images are scanned
+  once a day and whenever a new one appears, on this computer and on any other machine you switch
+  it on for.
+- Trivy can be installed from Meerkat where it is missing: into the home directory of the user
+  Meerkat works as, without root rights and checked against a checksum.
+- Vulnerabilities can be ignored and restored, and the settings choose from which severity on they
+  are reported, when the daily scan runs and whether those without a fix are shown.
+- Widgets can add further entries to the status bar besides their main one.
+
+### Changed
+
+- The Docker settings list this computer and other machines together as *Docker systems*, each with
+  the scanner found on it.
+
 ## [1.6.0] - 2026-11-27
 
 ### Added

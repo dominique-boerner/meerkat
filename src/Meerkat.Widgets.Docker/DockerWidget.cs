@@ -35,6 +35,8 @@ public sealed class DockerWidget(DockerWidgetViewModel viewModel, DockerSettings
 
     public IReadOnlyList<WidgetAlert> Alerts => viewModel.Alerts;
 
+    public IReadOnlyList<WidgetStatus> AdditionalStatuses => viewModel.AdditionalStatuses;
+
     public Task StartAsync(CancellationToken cancellationToken)
     {
         viewModel.Start();
