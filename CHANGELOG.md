@@ -9,6 +9,8 @@ The section of a version becomes the text of its GitHub release and is what Meer
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-28
+
 ### Added
 
 - The cards below the status bar can be put away: with the cross that takes the place of the age
