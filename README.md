@@ -172,8 +172,9 @@ SHA-256 checksum. Nothing is installed without your consent:
 
 The update check contacts `api.github.com` and `github.com` and sends no data besides the request
 itself. Apart from it, Meerkat only uses the network for the Git, Server and Services widgets once you have
-configured them, and only to reach the servers you entered. Updating requires write access to the
-folder `Meerkat.exe` is in, and is only available in the published single-file builds.
+configured them, and only to reach the servers you entered. Updating is only available in the
+published single-file builds. Where `Meerkat.exe` lies in a folder only administrators may change,
+such as `C:\Program Files`, Windows asks for administrator rights when the update is installed.
 
 ### Docker widget
 

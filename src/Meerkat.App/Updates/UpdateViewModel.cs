@@ -62,7 +62,9 @@ public sealed partial class UpdateViewModel : ObservableObject
     {
         UpdateState.Unsupported => "Only the published single-file releases can update themselves.",
         UpdateState.Downloading => "Downloading …",
+        UpdateState.Ready when _service.InstallOnExit && _service.NeedsAdministrator => "Will be installed when Meerkat exits. Windows will ask for administrator rights then.",
         UpdateState.Ready when _service.InstallOnExit => "Will be installed when Meerkat exits.",
+        UpdateState.Ready when _service.NeedsAdministrator => "Meerkat is in a folder only administrators may change, so Windows will ask for administrator rights.",
         UpdateState.Failed => _service.ErrorMessage ?? string.Empty,
         _ => string.Empty,
     };

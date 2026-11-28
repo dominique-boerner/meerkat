@@ -155,6 +155,73 @@ public sealed class UpdateComponentTests : IDisposable
     }
 
     [Fact]
+    public void Installer_AsksForAdministratorRightsWhereTheProgramFolderIsProtected()
+    {
+        var installed = Path.Combine(_directory, "Meerkat.exe");
+        var staged = Path.Combine(_directory, "staged.exe");
+        File.WriteAllText(installed, "old");
+        File.WriteAllText(staged, "new");
+        var elevatedCalls = new List<(string FileName, IReadOnlyList<string> Arguments)>();
+        var installer = new ExecutableSwapInstaller(
+            installed,
+            isSingleFile: true,
+            runElevated: (fileName, arguments) =>
+            {
+                // What Windows would start with administrator rights: the installed program, told to swap itself.
+                elevatedCalls.Add((fileName, arguments));
+                return ExecutableSwapInstaller.TryRunElevatedInstall(arguments, fileName) ?? -1;
+            },
+            canWrite: _ => false);
+        Assert.True(installer.NeedsAdministrator);
+
+        installer.Install(staged);
+
+        var call = Assert.Single(elevatedCalls);
+        Assert.Equal(installed, call.FileName);
+        Assert.Equal([ExecutableSwapInstaller.InstallArgument, staged, ChecksumFile.ComputeHash(staged)], call.Arguments);
+        Assert.Equal("new", File.ReadAllText(installed));
+        Assert.Equal("old", File.ReadAllText(installed + ".old"));
+        Assert.False(File.Exists(installed + ".new"));
+    }
+
+    [Fact]
+    public void ElevatedInstall_RefusesADownloadThatChangedAfterItWasVerified()
+    {
+        var installed = Path.Combine(_directory, "Meerkat.exe");
+        var staged = Path.Combine(_directory, "staged.exe");
+        File.WriteAllText(installed, "old");
+        File.WriteAllText(staged, "new");
+        var verified = ChecksumFile.ComputeHash(staged);
+        File.WriteAllText(staged, "tampered");
+
+        Assert.Equal(1, ExecutableSwapInstaller.TryRunElevatedInstall([ExecutableSwapInstaller.InstallArgument, staged, verified], installed));
+
+        Assert.Equal("old", File.ReadAllText(installed));
+        Assert.False(File.Exists(installed + ".new"));
+        Assert.False(File.Exists(installed + ".old"));
+
+        // Started for anything else, the program is none of the installer's business.
+        Assert.Null(ExecutableSwapInstaller.TryRunElevatedInstall([], installed));
+        Assert.Null(ExecutableSwapInstaller.TryRunElevatedInstall(["--something-else", staged, verified], installed));
+    }
+
+    [Fact]
+    public void Installer_ReportsDeclinedOrFailedElevationWithoutTouchingTheProgram()
+    {
+        var installed = Path.Combine(_directory, "Meerkat.exe");
+        var staged = Path.Combine(_directory, "staged.exe");
+        File.WriteAllText(installed, "old");
+        File.WriteAllText(staged, "new");
+        var declined = new ExecutableSwapInstaller(installed, isSingleFile: true, (_, _) => throw new System.ComponentModel.Win32Exception(1223), _ => false);
+        var failed = new ExecutableSwapInstaller(installed, isSingleFile: true, (_, _) => 1, _ => false);
+
+        Assert.Contains("were not granted", Assert.Throws<InvalidOperationException>(() => declined.Install(staged)).Message);
+        Assert.Throws<InvalidOperationException>(() => failed.Install(staged));
+        Assert.Equal("old", File.ReadAllText(installed));
+        Assert.False(new ExecutableSwapInstaller(installed, isSingleFile: true).NeedsAdministrator);
+    }
+
+    [Fact]
     public void Installer_RefusesBuildsThatAreNotSingleFile()
     {
         var installer = new ExecutableSwapInstaller(Path.Combine(_directory, "Meerkat.exe"), isSingleFile: false);

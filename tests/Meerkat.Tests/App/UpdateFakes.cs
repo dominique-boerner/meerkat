@@ -65,6 +65,8 @@ internal sealed class FakeUpdateInstaller : IUpdateInstaller
 {
     public bool IsSupported { get; set; } = true;
 
+    public bool NeedsAdministrator { get; set; }
+
     public List<string> Installed { get; } = [];
 
     public Exception? InstallFailure { get; set; }

@@ -9,6 +9,11 @@ The section of a version becomes the text of its GitHub release and is what Meer
 
 ## [Unreleased]
 
+### Fixed
+
+- Meerkat can update itself in a folder only administrators may change, such as `C:\Program Files`:
+  Windows asks for administrator rights when the update is installed. Before, the update failed there.
+
 ## [1.7.0] - 2026-11-28
 
 ### Added

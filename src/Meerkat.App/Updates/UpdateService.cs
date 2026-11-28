@@ -38,6 +38,9 @@ public sealed partial class UpdateService(
     private static readonly TimeSpan StartupDelay = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(24);
 
+    // Asked once: finding out means trying to write into the program folder.
+    private readonly Lazy<bool> _needsAdministrator = new(() => installer.NeedsAdministrator);
+
     private CancellationTokenSource? _downloadCancellation;
     private string? _stagedExecutable;
     private bool _isChecking;
@@ -61,6 +64,9 @@ public sealed partial class UpdateService(
     public event EventHandler? RestartRequested;
 
     public SemanticVersion InstalledVersion => environment.InstalledVersion;
+
+    /// <summary>True where installing makes Windows ask for administrator rights.</summary>
+    public bool NeedsAdministrator => _needsAdministrator.Value;
 
     /// <summary>Checks at startup and then once a day for as long as the application runs.</summary>
     public async Task RunAsync(CancellationToken cancellationToken)
