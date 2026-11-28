@@ -9,6 +9,8 @@ The section of a version becomes the text of its GitHub release and is what Meer
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-28
+
 ### Added
 
 - The Docker widget scans the images of your containers for known vulnerabilities with Trivy. A new
@@ -22,10 +24,10 @@ The section of a version becomes the text of its GitHub release and is what Meer
 - Vulnerabilities can be ignored and restored, and the settings choose from which severity on they
   are reported, when the daily scan runs and whether those without a fix are shown.
 - Widgets can add further entries to the status bar besides their main one.
-
 - A *Machines* page in the settings, where other machines are entered once for all widgets. The
   Docker and Server pages only choose what a machine is used for. Hosts entered before are moved
-  there on the first start; a host both widgets knew becomes one machine.
+  there on the first start; a host both widgets knew becomes one machine. An older version of
+  Meerkat does not find them there, so they would have to be entered again after going back to one.
 - *Open settings.json* in the settings window opens the settings file, and Meerkat takes over what
   is saved in it right away.
 
