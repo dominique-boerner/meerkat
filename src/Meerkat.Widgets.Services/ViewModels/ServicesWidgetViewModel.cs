@@ -92,6 +92,37 @@ public sealed partial class ServicesWidgetViewModel(
         UpdateStatus();
     }
 
+    /// <summary>What the widget offers in the action search, for the services watched right now.</summary>
+    public IReadOnlyList<WidgetAction> Actions => Services.Count == 0 ? [] :
+    [
+        new()
+        {
+            Id = "open-status-page",
+            Title = "Open status page",
+            TargetPrompt = "Choose a service …",
+            Targets = () =>
+            [
+                new WidgetActionTargetGroup("Services",
+                [
+                    .. Services.Select(service => new WidgetActionTarget(
+                        service.Endpoint.Id,
+                        service.Name,
+                        Severity: service.IsKnown ? service.Severity : null)),
+                ]),
+            ],
+            Run = (target, _) =>
+            {
+                if (Services.FirstOrDefault(service => service.Endpoint.Id == target?.Id) is not { } service)
+                {
+                    return Task.FromResult(WidgetActionResult.Failure($"{target?.Title ?? "The service"} is no longer watched"));
+                }
+
+                overlayCommands.OpenUrl(service.Endpoint.GetPageUri());
+                return Task.FromResult(WidgetActionResult.Done);
+            },
+        },
+    ];
+
     [RelayCommand]
     private async Task RecheckAsync(ServiceViewModel service)
     {

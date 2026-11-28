@@ -63,6 +63,13 @@ public sealed class ContainerSourceOptions
     };
 }
 
+public enum ContainerOperation
+{
+    Start,
+    Stop,
+    Restart,
+}
+
 /// <summary>The containers of one Docker instance: the local one in WSL, or one on another machine.</summary>
 public sealed partial class ContainerSourceViewModel(
     IContainerProvider provider,
@@ -355,7 +362,39 @@ public sealed partial class ContainerSourceViewModel(
         }
     }
 
-    private async Task RunActionAsync(Func<CancellationToken, Task> action)
+    /// <summary>
+    /// Starts, stops or restarts a container on request of the action search, and tells how it went
+    /// instead of only showing it on the page.
+    /// </summary>
+    public async Task<WidgetActionResult> ControlAsync(ContainerRowViewModel container, ContainerOperation operation)
+    {
+        var (done, failed) = operation switch
+        {
+            ContainerOperation.Start => ("was started", "could not be started"),
+            ContainerOperation.Stop => ("was stopped", "could not be stopped"),
+            _ => ("was restarted", "could not be restarted"),
+        };
+
+        var error = await RunActionAsync(token => operation switch
+        {
+            ContainerOperation.Start => provider.StartAsync(container.Id, token),
+            ContainerOperation.Stop => provider.StopAsync(container.Id, token),
+            _ => provider.RestartAsync(container.Id, token),
+        });
+        if (error is not null)
+        {
+            return WidgetActionResult.Failure($"{container.Name} {failed}", error);
+        }
+
+        // Docker reports a start as done even when the container ends again right away; the list read after it knows better.
+        var current = Containers.FirstOrDefault(row => row.Id == container.Id);
+        return operation != ContainerOperation.Stop && current is { IsRunning: false }
+            ? WidgetActionResult.Failure($"{container.Name} did not stay up", current.Status)
+            : WidgetActionResult.Success($"{container.Name} {done}");
+    }
+
+    /// <summary>Returns what went wrong; null when the action went through.</summary>
+    private async Task<string?> RunActionAsync(Func<CancellationToken, Task> action)
     {
         var cancellationToken = _cancellation?.Token ?? CancellationToken.None;
         try
@@ -363,14 +402,16 @@ public sealed partial class ContainerSourceViewModel(
             await action(cancellationToken);
             SetError(ErrorSource.Action, null);
             await RefreshListAsync(cancellationToken);
+            return null;
         }
         catch (OperationCanceledException)
         {
-            // Widget was stopped while the action was running.
+            return "Docker is no longer watched.";
         }
         catch (Exception exception)
         {
             SetError(ErrorSource.Action, exception.Message);
+            return exception.Message;
         }
     }
 

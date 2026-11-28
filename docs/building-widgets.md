@@ -124,6 +124,7 @@ public sealed class DiskWidget(IOverlayState overlayState) : IOverlayWidget
 | `Alerts` | Conditions that need attention right now. An alert may bring an `Icon` that tells what it is about; otherwise its card shows the icon of the widget. Keep the title stable while the alert says the same thing: a card the user put away returns when the title changes. |
 | `StatusCard` | Optional card below the status bar for something the user chose to keep in view, see [Status cards and hotkeys](#status-cards-and-hotkeys). |
 | `Hotkeys` | Optional global hotkeys, see [Status cards and hotkeys](#status-cards-and-hotkeys). |
+| `Actions` | Optional things the widget does on request, see [Actions](#actions). |
 | `StatusChanged` | Raise it whenever `Status`, `AdditionalStatuses`, `Alerts` or `StatusCard` changed. It may be raised from any thread. |
 | `SettingsPage` | Optional settings editor, see [Settings](#settings). |
 | `StartAsync` / `StopAsync` | Called when the widget is enabled, disabled or restarted, and on shutdown. Both run on the UI thread. |
@@ -190,7 +191,7 @@ package source in a `nuget.config` next to your project:
   </PropertyGroup>
   <ItemGroup>
     <!-- Meerkat brings the contracts itself, so they are built against but not copied. -->
-    <PackageReference Include="Meerkat.Abstractions" Version="1.0.0" ExcludeAssets="runtime" />
+    <PackageReference Include="Meerkat.Abstractions" Version="1.1.0" ExcludeAssets="runtime" />
   </ItemGroup>
 </Project>
 ```
@@ -277,6 +278,50 @@ settings so the user can change the combination, and calls the handler on the UI
 identifies the hotkey in the stored settings, so keep it stable. A hotkey should do something that is
 worth interrupting the user's work for, such as opening a window of your own for a quick entry.
 
+## Actions
+
+The shell has a search for actions that opens above any window with a global hotkey. A widget adds
+to it by returning `WidgetAction`s, so that the user can act without opening the panel first:
+
+```csharp
+public IReadOnlyList<WidgetAction> Actions =>
+[
+    new()
+    {
+        Id = "empty-recycle-bin",
+        Title = "Empty recycle bin",
+        Hint = "1.2 GB",
+        Confirm = _ => new WidgetActionConfirmation("Empty the recycle bin?", "This cannot be undone.", "Empty"),
+        Run = async (_, cancellationToken) =>
+        {
+            await EmptyAsync(cancellationToken);
+            return WidgetActionResult.Success("The recycle bin is empty");
+        },
+    },
+];
+```
+
+`Actions` is read on the UI thread every time the search opens, so the list and its hints may follow
+the state of the widget; leave out what is not possible right now, and keep the getter cheap.
+
+- **Targets.** An action that applies to one of several things returns them from `Targets`, in
+  groups; the search then asks for one in a second step and hands it to `Run`. A target the action
+  cannot be applied to is listed with the reason in `Unavailable`, so that nobody looks for it in
+  vain, but cannot be chosen. Identify targets by an id and look them up again in `Run`: time has
+  passed since they were listed.
+- **Confirmation.** `Confirm` may return a question for what cannot be undone and for what others
+  would notice, such as a change on another machine. Do not ask for everything.
+- **Result.** `WidgetActionResult.Done` closes the search without a word, for an action whose result
+  shows itself, such as a page that opens. `Success` says a sentence that is shown for a moment.
+  `Failure` stays until it was read and offers to open the page of the widget, so show the problem
+  there too. Await what the action does and report how it really ended, not that it was started.
+- **Free text.** One action may set `RunWithText`; it is offered what the user typed when nothing
+  matched it. The Notes widget saves such text as a quick note.
+- To show the result on your page, ask `IOverlayCommands.ShowWidget` for it.
+
+Write titles as requests ("Restart container") and keep the id stable; the actions used last are
+remembered under it.
+
 ## Services provided by the shell
 
 Request these through constructor injection.
@@ -286,7 +331,7 @@ Request these through constructor injection.
 | `IOverlayState` | Read whether Meerkat is visible and whether the panel is open, and react to changes through `Changed`. |
 | `IWidgetSettingsStore` | Load and save a settings object for your widget. It is stored as JSON in the user's settings file. |
 | `IWidgetSecretStore` | Keep secrets such as access tokens in the Windows Credential Manager instead of the settings file. |
-| `IOverlayCommands` | Ask the shell to open the settings window or a web address in the browser. |
+| `IOverlayCommands` | Ask the shell to open the settings window, a web address in the browser or the page of a widget in the panel. |
 
 A widget that needs to reach other machines can reference the `Meerkat.Ssh` project and request
 `ISshClient`. It runs commands through the OpenSSH client of Windows, so the user's SSH configuration,

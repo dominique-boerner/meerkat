@@ -115,6 +115,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     private string _toggleVisibilityHotkey;
 
     [ObservableProperty]
+    private string _actionSearchHotkey;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(OpacityText))]
     private double _opacity;
 
@@ -189,6 +192,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         var current = settings.Current;
         _togglePanelHotkey = HotkeyGesture.ToDisplayText(current.TogglePanelHotkey);
         _toggleVisibilityHotkey = HotkeyGesture.ToDisplayText(current.ToggleVisibilityHotkey);
+        _actionSearchHotkey = HotkeyGesture.ToDisplayText(current.ActionSearchHotkey);
         _opacity = current.Opacity;
         _selectedMonitor = monitors.FirstOrDefault(option => option.DeviceName == current.Monitor) ?? monitors[0];
         _startWithWindows = autostart?.IsEnabled ?? false;
@@ -291,6 +295,8 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     partial void OnToggleVisibilityHotkeyChanged(string value) => Apply();
 
+    partial void OnActionSearchHotkeyChanged(string value) => Apply();
+
     partial void OnOpacityChanged(double value) => Apply();
 
     partial void OnSelectedMonitorChanged(MonitorOption value) => Apply();
@@ -322,13 +328,14 @@ public sealed partial class SettingsViewModel : ObservableObject
 
         UpdateHotkeyAvailability();
         if (!HotkeyGesture.TryParse(TogglePanelHotkey, out var togglePanel)
-            || !HotkeyGesture.TryParse(ToggleVisibilityHotkey, out var toggleVisibility))
+            || !HotkeyGesture.TryParse(ToggleVisibilityHotkey, out var toggleVisibility)
+            || !HotkeyGesture.TryParse(ActionSearchHotkey, out var actionSearch))
         {
             ErrorMessage = "Not stored: hotkeys need at least one modifier and a key, e.g. Ctrl+Alt+O.";
             return;
         }
 
-        var gestures = new List<HotkeyGesture> { togglePanel, toggleVisibility };
+        var gestures = new List<HotkeyGesture> { togglePanel, toggleVisibility, actionSearch };
         foreach (var hotkey in _widgetHotkeys)
         {
             if (!HotkeyGesture.TryParse(hotkey.Gesture, out var gesture))
@@ -351,6 +358,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             var current = _settings.Current;
             current.TogglePanelHotkey = togglePanel.ToString();
             current.ToggleVisibilityHotkey = toggleVisibility.ToString();
+            current.ActionSearchHotkey = actionSearch.ToString();
             foreach (var hotkey in _widgetHotkeys)
             {
                 current.WidgetHotkeys[hotkey.SettingsKey] = HotkeyGesture.ToDisplayText(hotkey.Gesture);

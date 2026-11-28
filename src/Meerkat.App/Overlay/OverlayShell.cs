@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.Input;
 using Meerkat.Abstractions;
+using Meerkat.App.Actions;
 using Meerkat.App.Diagnostics;
 using Meerkat.App.Hotkeys;
 using Meerkat.App.Plugins;
@@ -38,6 +39,9 @@ public sealed class OverlayShell(
 {
     private const int TogglePanelHotkeyId = 1;
     private const int ToggleVisibilityHotkeyId = 2;
+    private const int ActionSearchHotkeyId = 3;
+    private const string ShellArea = "Meerkat";
+    private const string ShellIcon = "\uE713";
 
     // Ids of widget hotkeys start here, clear of the shell's own.
     private const int FirstWidgetHotkeyId = 100;
@@ -52,6 +56,7 @@ public sealed class OverlayShell(
     private StatusBarWindow? _statusBarWindow;
     private PanelWindow? _panelWindow;
     private SettingsWindow? _settingsWindow;
+    private ActionPaletteWindow? _paletteWindow;
     private DispatcherTimer? _ageTimer;
     private string? _hotkeyWarning;
     private bool _isExiting;
@@ -77,6 +82,7 @@ public sealed class OverlayShell(
         tray.SettingsRequested += (_, _) => OpenSettings();
         tray.ExitRequested += async (_, _) => await ExitAsync(restart: false);
         commands.SettingsRequested += (_, _) => OpenSettings();
+        commands.WidgetRequested += (_, widgetId) => ShowWidget(widgetId);
         updates.RestartRequested += async (_, _) => await ExitAsync(restart: true);
         updateViewModel.PropertyChanged += (_, _) => RefreshStatus();
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
@@ -272,6 +278,114 @@ public sealed class OverlayShell(
     }
 
     private void TogglePanel() => SetPanelOpen(!state.IsPanelOpen);
+
+    /// <summary>Opens the search for what the widgets offer to do, above whatever the user works in.</summary>
+    private void OpenActionSearch()
+    {
+        if (_paletteWindow is not null)
+        {
+            _paletteWindow.Activate();
+            return;
+        }
+
+        var viewModel = new ActionPaletteViewModel(CollectActions(), [.. settings.Current.RecentActions]);
+        viewModel.ActionUsed += (_, key) => RememberAction(key);
+        viewModel.WidgetRequested += (_, widgetId) => ShowWidget(widgetId);
+        _paletteWindow = new ActionPaletteWindow(viewModel);
+        _paletteWindow.Closed += (_, _) => _paletteWindow = null;
+        _paletteWindow.Show();
+    }
+
+    private List<PaletteAction> CollectActions()
+    {
+        var actions = new List<PaletteAction>();
+        foreach (var hosted in _hostedWidgets.Where(hosted => hosted.IsActive && hosted.Entry.Failure is null))
+        {
+            try
+            {
+                actions.AddRange(hosted.Widget.Actions.Select(action => new PaletteAction(hosted.Entry.Id, hosted.Entry.Title, hosted.Entry.Icon, action)));
+            }
+            catch (Exception exception)
+            {
+                // A widget that cannot say what it offers must not keep the others from being found.
+                errorLog.Write($"Widget '{hosted.Entry.Id}' failed to list its actions", exception);
+            }
+        }
+
+        actions.AddRange(CreateShellActions().Select(action => new PaletteAction(null, ShellArea, ShellIcon, action)));
+        return actions;
+    }
+
+    private IEnumerable<WidgetAction> CreateShellActions()
+    {
+        yield return new WidgetAction
+        {
+            Id = "open-panel",
+            Title = "Open panel",
+            Hint = state.PanelHotkeyText,
+            Run = (_, _) =>
+            {
+                SetPanelOpen(true);
+                return Task.FromResult(WidgetActionResult.Done);
+            },
+        };
+        yield return new WidgetAction
+        {
+            Id = "toggle-visibility",
+            Title = state.IsVisible ? "Hide status display" : "Show status display",
+            Hint = HotkeyGesture.ToDisplayText(settings.Current.ToggleVisibilityHotkey),
+            Run = (_, _) =>
+            {
+                ToggleVisibility();
+                return Task.FromResult(WidgetActionResult.Done);
+            },
+        };
+        if (statusBar.Alerts.Count > 0)
+        {
+            yield return new WidgetAction
+            {
+                Id = "dismiss-cards",
+                Title = "Put all cards away",
+                Hint = statusBar.Alerts.Count == 1 ? "1 card" : $"{statusBar.Alerts.Count} cards",
+                Run = (_, _) =>
+                {
+                    var count = statusBar.DismissAllAlerts();
+                    return Task.FromResult(WidgetActionResult.Success(count == 1 ? "1 card was put away" : $"{count} cards were put away"));
+                },
+            };
+        }
+
+        yield return new WidgetAction
+        {
+            Id = "open-settings",
+            Title = "Open settings",
+            Run = (_, _) =>
+            {
+                OpenSettings();
+                return Task.FromResult(WidgetActionResult.Done);
+            },
+        };
+    }
+
+    private void RememberAction(string key)
+    {
+        var recent = settings.Current.RecentActions;
+        recent.Remove(key);
+        recent.Insert(0, key);
+        if (recent.Count > ActionPaletteViewModel.MaxRecent)
+        {
+            recent.RemoveRange(ActionPaletteViewModel.MaxRecent, recent.Count - ActionPaletteViewModel.MaxRecent);
+        }
+
+        try
+        {
+            settings.Save();
+        }
+        catch (Exception exception)
+        {
+            errorLog.Write("Remembering the last action failed", exception);
+        }
+    }
 
     /// <summary>Opens the panel on the page of a widget; without an id the panel opens where it was left.</summary>
     private void ShowWidget(string? widgetId)
@@ -549,6 +663,7 @@ public sealed class OverlayShell(
         var failedHotkeys = new List<string>();
         RegisterHotkey(TogglePanelHotkeyId, current.TogglePanelHotkey, TogglePanel, failedHotkeys);
         RegisterHotkey(ToggleVisibilityHotkeyId, current.ToggleVisibilityHotkey, ToggleVisibility, failedHotkeys);
+        RegisterHotkey(ActionSearchHotkeyId, current.ActionSearchHotkey, OpenActionSearch, failedHotkeys);
         foreach (var hosted in _hostedWidgets)
         {
             foreach (var hotkey in hosted.Hotkeys)
@@ -643,6 +758,7 @@ public sealed class OverlayShell(
             await StopWidgetAsync(hosted);
         }
 
+        _paletteWindow?.Close();
         _settingsWindow?.Close();
         _panelWindow?.Close();
         _statusBarWindow?.Close();

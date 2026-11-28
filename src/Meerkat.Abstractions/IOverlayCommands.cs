@@ -7,4 +7,9 @@ public interface IOverlayCommands
 
     /// <summary>Opens a web address in the user's browser. Anything but http and https is ignored.</summary>
     void OpenUrl(Uri url);
+
+    /// <summary>Opens the panel on the page of a widget, for an action whose result is to be seen there.</summary>
+    void ShowWidget(string widgetId)
+    {
+    }
 }

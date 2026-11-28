@@ -25,6 +25,6 @@
       Raise the minor number when something is added, and the major number when something a plugin
       may use is removed or changed; Meerkat then refuses plugins built against the old major version.
     -->
-    <ContractVersion>1.0.0</ContractVersion>
+    <ContractVersion>1.1.0</ContractVersion>
   </PropertyGroup>
 </Project>

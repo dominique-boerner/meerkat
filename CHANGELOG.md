@@ -9,6 +9,19 @@ The section of a version becomes the text of its GitHub release and is what Meer
 
 ## [Unreleased]
 
+### Added
+
+- Action search: `Ctrl+Alt+A` opens a search field above any window that finds what the widgets can
+  do and does it without the panel. Actions that apply to one of several things ask for it in a
+  second step; those that others would notice ask before they run. The search says how an action
+  went, and leads to the page of its widget when it failed. Text that matches no action can be
+  saved as a quick note.
+- Actions to start with: start, stop and restart a container, show its logs and scan the images; open
+  the latest pipeline, run a failed one again and open the reviews waiting for you; open a terminal
+  on a server and check all servers; open the status page of a service; the notes; and the panel,
+  the status display, the cards and the settings of Meerkat itself.
+- Widgets, plugins included, add actions of their own; the contracts for widgets are at version 1.1.
+
 ## [1.9.0] - 2026-11-28
 
 ### Added

@@ -40,6 +40,8 @@ public sealed class ServerWidget(ServerWidgetViewModel viewModel, ServerSettings
 
     public IReadOnlyList<WidgetAlert> Alerts => viewModel.Alerts;
 
+    public IReadOnlyList<WidgetAction> Actions => viewModel.Actions;
+
     public Task StartAsync(CancellationToken cancellationToken)
     {
         viewModel.Start();

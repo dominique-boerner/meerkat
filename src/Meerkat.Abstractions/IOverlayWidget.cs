@@ -37,6 +37,12 @@ public interface IOverlayWidget
     /// <summary>Global hotkeys of the widget. Read once when the widget is registered.</summary>
     IReadOnlyList<WidgetHotkey> Hotkeys => [];
 
+    /// <summary>
+    /// What the widget does on request, offered in the action search of the shell. Read on the UI thread
+    /// every time the search opens, so the list may follow the widget's state; keep it cheap.
+    /// </summary>
+    IReadOnlyList<WidgetAction> Actions => [];
+
     /// <summary>Raise whenever <see cref="Status"/>, <see cref="AdditionalStatuses"/>, <see cref="Alerts"/> or <see cref="StatusCard"/> changed.</summary>
     event EventHandler? StatusChanged
     {

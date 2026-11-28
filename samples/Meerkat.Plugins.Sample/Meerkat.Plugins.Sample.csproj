@@ -2,7 +2,7 @@
   <!--
     A widget that is not part of Meerkat but loaded from the plugins folder. A plugin of your own
     lives in its own repository and references the package instead of the project:
-      <PackageReference Include="Meerkat.Abstractions" Version="1.0.0" ExcludeAssets="runtime" />
+      <PackageReference Include="Meerkat.Abstractions" Version="1.1.0" ExcludeAssets="runtime" />
   -->
   <PropertyGroup>
     <UseWPF>true</UseWPF>

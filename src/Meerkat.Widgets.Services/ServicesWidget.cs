@@ -41,6 +41,8 @@ public sealed class ServicesWidget(ServicesWidgetViewModel viewModel, ServicesSe
 
     public IReadOnlyList<WidgetAlert> Alerts => viewModel.Alerts;
 
+    public IReadOnlyList<WidgetAction> Actions => viewModel.Actions;
+
     public Task StartAsync(CancellationToken cancellationToken)
     {
         viewModel.Start();

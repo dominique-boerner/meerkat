@@ -231,7 +231,13 @@
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource Overlay.FormLabel}" Text="Search actions" />
+                                <local:HotkeyBox Grid.Row="2" Grid.Column="1" Margin="0,5"
+                                                 Hotkey="{Binding ActionSearchHotkey}"
+                                                 RecordingStarted="OnHotkeyRecordingStarted"
+                                                 RecordingStopped="OnHotkeyRecordingStopped" />
                                 <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource Overlay.FormLabel}" Text="Open/close panel" />
                                 <local:HotkeyBox Grid.Row="0" Grid.Column="1" Margin="0,5"
                                                  Hotkey="{Binding TogglePanelHotkey}"

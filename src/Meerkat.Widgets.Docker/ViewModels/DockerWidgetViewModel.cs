@@ -59,6 +59,9 @@ public sealed partial class DockerWidgetViewModel(
 
     public bool IsContainersTab => !IsSecurityTab;
 
+    /// <summary>What the widget offers in the action search, for the containers and images known right now.</summary>
+    public IReadOnlyList<WidgetAction> Actions => DockerActions.Create(this, overlayCommands);
+
     public void Start()
     {
         if (_isStarted)

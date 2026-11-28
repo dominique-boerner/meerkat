@@ -38,6 +38,8 @@ public sealed class GitWidget(GitWidgetViewModel viewModel, GitSettingsPage sett
 
     public IReadOnlyList<WidgetAlert> Alerts => viewModel.Alerts;
 
+    public IReadOnlyList<WidgetAction> Actions => viewModel.Actions;
+
     public Task StartAsync(CancellationToken cancellationToken)
     {
         viewModel.Start();

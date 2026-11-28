@@ -187,6 +187,33 @@ public sealed partial class StatusBarViewModel : ObservableObject
         Hide(card, new DateTimeOffset(now.Date.AddDays(1), now.Offset));
     }
 
+    /// <summary>Puts away every card that is shown, also those that found no room below the bar; returns how many.</summary>
+    public int DismissAllAlerts()
+    {
+        if (_lastUpdate is not { } last)
+        {
+            return 0;
+        }
+
+        var keys = last.Reports
+            .SelectMany(report => report.Alerts.Where(IsCardWorthy).Select(alert => GetAlertKey(report.WidgetId, alert)))
+            .Where(key => !_hidden.ContainsKey(key))
+            .Distinct()
+            .ToList();
+        foreach (var key in keys)
+        {
+            _hidden[key] = null;
+        }
+
+        if (keys.Count > 0)
+        {
+            Update(last.Reports, last.Now, last.PanelHotkeyText, last.Notice);
+            HiddenAlertsChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        return keys.Count;
+    }
+
     private static bool IsCardWorthy(WidgetAlert alert) => alert.Severity == WidgetSeverity.Error || alert.Prominent;
 
     /// <summary>Whether the widget has cards to show and the user has put every one of them away.</summary>

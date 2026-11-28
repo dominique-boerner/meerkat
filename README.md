@@ -31,6 +31,9 @@ services, and for notes.
 - *Panel*: a side panel, opened with a global hotkey, with one page per widget and badges for
   widgets that need attention; it stays open next to your work until you close it
 - A second hotkey hides and shows Meerkat entirely; hidden widgets stop polling
+- *Action search*: a third hotkey opens a search field above whatever you work in that finds what the
+  widgets can do, such as restarting a container, running a failed pipeline again or opening a
+  terminal on a server, and does it without the panel
 - Tray icon with quick access to the panel, the settings and exit
 - Per-monitor DPI aware; choose the monitor the status bar and the panel appear on
 - A failing widget is suspended and can be restarted without affecting the shell or other widgets
@@ -125,6 +128,22 @@ its place is remembered relative to the screen, so it is the same on every monit
 The panel stays open while you work in other windows. It closes when you press `Esc` inside it,
 press the hotkey again or use its close button. Drag its left edge to change the width, for example to read long log
 lines; a double-click on the edge restores the default. Both actions are also available from the tray icon.
+
+### Action search
+
+`Ctrl+Alt+A` opens the action search above any window. Type a few letters of what you want to do;
+they need not be a whole word. `↑` `↓` choose, `Enter` runs, `Esc` takes back one step and closes the
+search from the first one.
+
+- An action whose name ends in `…` asks in a second step what to apply it to, such as a container.
+- Actions that change something cannot be chosen for machines that are read-only, and ask before
+  they touch another machine.
+- A success is said and the search closes; a failure stays and leads to the page of its widget.
+- Text that matches no action can be saved as a quick note with `Enter`.
+- The actions used last are listed first while the field is empty.
+
+Every widget brings its own actions, plugins included. The hotkey is set on the *General* page of the
+settings.
 
 ### Configuration
 

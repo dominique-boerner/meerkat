@@ -12,6 +12,11 @@ public sealed class OverlaySettings
 
     public string ToggleVisibilityHotkey { get; set; } = "Ctrl+Alt+H";
 
+    public string ActionSearchHotkey { get; set; } = "Ctrl+Alt+A";
+
+    /// <summary>The actions the user ran last through the search, the latest first, by "widget id/action id".</summary>
+    public List<string> RecentActions { get; set; } = [];
+
     /// <summary>Combinations the user chose for hotkeys of widgets, by "widget id/hotkey id"; others use their default.</summary>
     public Dictionary<string, string> WidgetHotkeys { get; set; } = [];
 

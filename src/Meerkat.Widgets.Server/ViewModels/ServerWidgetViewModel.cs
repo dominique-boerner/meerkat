@@ -97,6 +97,59 @@ public sealed partial class ServerWidgetViewModel(
         UpdateStatus();
     }
 
+    /// <summary>What the widget offers in the action search, for the servers watched right now.</summary>
+    public IReadOnlyList<WidgetAction> Actions => Hosts.Count == 0 ? [] :
+    [
+        new()
+        {
+            Id = "open-terminal",
+            Title = "Open SSH terminal",
+            TargetPrompt = "Choose a server …",
+            Targets = () =>
+            [
+                new WidgetActionTargetGroup("Servers",
+                [
+                    .. Hosts.Select(host => new WidgetActionTarget(
+                        host.Host.Id,
+                        host.Name,
+                        host.Address,
+                        host.IsOnline ? WidgetSeverity.Ok : host.IsIdle ? null : WidgetSeverity.Error)),
+                ]),
+            ],
+            Run = (target, _) =>
+            {
+                if (Hosts.FirstOrDefault(host => host.Host.Id == target?.Id) is not { } host)
+                {
+                    return Task.FromResult(WidgetActionResult.Failure($"{target?.Title ?? "The server"} is no longer watched"));
+                }
+
+                try
+                {
+                    probe.OpenTerminal(host.Host);
+                    return Task.FromResult(WidgetActionResult.Done);
+                }
+                catch (Exception exception)
+                {
+                    return Task.FromResult(WidgetActionResult.Failure("The terminal could not be opened", exception.Message));
+                }
+            },
+        },
+        new()
+        {
+            Id = "check-servers",
+            Title = "Check all servers now",
+            Run = async (_, _) =>
+            {
+                var hosts = Hosts.Where(host => !host.IsPaused).ToList();
+                await Task.WhenAll(hosts.Select(RecheckAsync));
+                var problems = hosts.Count(host => !host.IsOnline);
+                return problems == 0
+                    ? WidgetActionResult.Success(hosts.Count == 1 ? "The server is fine" : $"All {hosts.Count} servers are fine")
+                    : WidgetActionResult.Failure(problems == 1 ? "1 server has a problem" : $"{problems} servers have a problem", string.Join(", ", hosts.Where(host => !host.IsOnline).Select(host => host.Name)));
+            },
+        },
+    ];
+
     [RelayCommand]
     private async Task RecheckAsync(HostViewModel host)
     {

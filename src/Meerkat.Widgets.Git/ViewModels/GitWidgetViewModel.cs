@@ -171,6 +171,81 @@ public sealed partial class GitWidgetViewModel : ObservableObject
         }
     }
 
+    /// <summary>What the widget offers in the action search, for the pipelines and reviews known right now.</summary>
+    public IReadOnlyList<WidgetAction> Actions
+    {
+        get
+        {
+            var actions = new List<WidgetAction>();
+            var pipeline = Terminology.PipelineSingular.ToLowerInvariant();
+            if (Pipelines.MaxBy(row => row.Run.UpdatedAt) is { } latest)
+            {
+                actions.Add(new WidgetAction
+                {
+                    Id = "open-latest-pipeline",
+                    Title = $"Open latest {pipeline}",
+                    Hint = $"{latest.ProjectName} · {latest.Run.Ref}",
+                    Run = (_, _) =>
+                    {
+                        OpenUrl(latest.Run.WebUrl);
+                        return Task.FromResult(WidgetActionResult.Done);
+                    },
+                });
+            }
+
+            if (_provider is { } provider && Pipelines.Where(row => row.IsFailed).MaxBy(row => row.Run.UpdatedAt) is { } failed)
+            {
+                actions.Add(new WidgetAction
+                {
+                    Id = "retry-failed-pipeline",
+                    Title = $"Run failed {pipeline} again",
+                    Hint = $"{failed.ProjectName} · {failed.Run.Ref} · #{failed.Run.Number}",
+                    Run = async (_, cancellationToken) =>
+                    {
+                        try
+                        {
+                            await provider.RetryAsync(failed.Run, cancellationToken);
+                        }
+                        catch (Exception exception) when (exception is not OperationCanceledException)
+                        {
+                            return WidgetActionResult.Failure($"#{failed.Run.Number} could not be run again", exception.Message);
+                        }
+
+                        _wake.TrySetResult();
+                        return WidgetActionResult.Success($"#{failed.Run.Number} of {failed.ProjectName} runs again");
+                    },
+                });
+            }
+
+            if (ReviewRequests.Count > 0)
+            {
+                actions.Add(new WidgetAction
+                {
+                    Id = "open-reviews",
+                    Title = "Open reviews for me",
+                    Hint = $"{ReviewRequests.Count} open",
+                    Run = (_, _) =>
+                    {
+                        // One request is opened where it is reviewed; several are listed for choosing.
+                        if (ReviewRequests is [var only])
+                        {
+                            OpenUrl(only.WebUrl);
+                        }
+                        else
+                        {
+                            SelectTab(Tabs.First(tab => tab.Tab == GitTab.ReviewRequests));
+                            _overlayCommands.ShowWidget(GitWidget.WidgetId);
+                        }
+
+                        return Task.FromResult(WidgetActionResult.Done);
+                    },
+                });
+            }
+
+            return actions;
+        }
+    }
+
     [RelayCommand]
     private void Refresh() => _wake.TrySetResult();
 

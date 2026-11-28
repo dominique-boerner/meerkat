@@ -9,7 +9,12 @@ public sealed class OverlayCommands(ErrorLog errorLog) : IOverlayCommands
 {
     public event EventHandler? SettingsRequested;
 
+    /// <summary>Raised with the id of the widget whose page is asked for.</summary>
+    public event EventHandler<string>? WidgetRequested;
+
     public void OpenSettings() => SettingsRequested?.Invoke(this, EventArgs.Empty);
+
+    public void ShowWidget(string widgetId) => WidgetRequested?.Invoke(this, widgetId);
 
     public void OpenUrl(Uri url)
     {
