@@ -9,6 +9,8 @@ The section of a version becomes the text of its GitHub release and is what Meer
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-11-28
+
 ### Fixed
 
 - Meerkat can update itself in a folder only administrators may change, such as `C:\Program Files`:
